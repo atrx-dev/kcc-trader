@@ -48,6 +48,29 @@
   animation-play-state: paused;
 }
 
+.card-stack {
+  position: relative;
+  container-type: inline-size;
+}
+
+.duplicate-mark .duplicate-long {
+  display: none;
+}
+
+@container (min-width: 150px) {
+  .duplicate-mark {
+    padding-inline: 0.5rem;
+  }
+
+  .duplicate-mark .duplicate-short {
+    display: none;
+  }
+
+  .duplicate-mark .duplicate-long {
+    display: inline;
+  }
+}
+
 .entry {
   display: flex;
   flex-direction: column;

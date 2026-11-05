@@ -234,13 +234,15 @@ export function SettingsSheet({
                     />
                   </Fragment>
                 ))}
-                <span className="text-sm font-medium text-white/70">Owned</span>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                <span className="w-[4.5rem] shrink-0 text-sm font-medium text-white/70">Owned</span>
                 {ownedAvailable ? (
                   <OwnedToggle
                     value={defaults.owned}
                     disabled={false}
                     onChange={(value) => setDefaults({ ...defaults, owned: value })}
-                      className="flex w-full [&>button]:flex-1 [&>button]:px-2"
+                    className="w-fit max-w-full [&>button]:px-1.5"
                   />
                 ) : (
                   <p className="text-xs text-white/50">Sign in to set this default.</p>

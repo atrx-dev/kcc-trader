@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { cardKey, type Card } from "../../types.ts";
 import { VirtualGrid } from "../VirtualGrid.tsx";
-import { type SessionUser, type ListName, LIST_COPY, ACTIONS_HEIGHT } from "../model.ts";
+import { type SessionUser, type ListName, type OwnedState, LIST_COPY, ACTIONS_HEIGHT, duplicateCount } from "../model.ts";
 import { CardFace } from "../components/cards.tsx";
 import { SearchField } from "../components/controls.tsx";
 import { EmptyState, SectionHeading, ShareListsButton } from "../components/common.tsx";
@@ -28,6 +28,7 @@ export function ListPage({
   onQuery,
   onToggle,
   unlistedDuplicates,
+  owned,
 }: {
   list: ListName;
   user: SessionUser | null;
@@ -46,6 +47,7 @@ export function ListPage({
   onQuery: (value: string) => void;
   onToggle: (list: ListName, key: string, present: boolean) => void;
   unlistedDuplicates: Card[];
+  owned: OwnedState;
 }) {
   const copy = LIST_COPY[list];
   const Icon = copy.icon;
@@ -132,7 +134,7 @@ export function ListPage({
                     const already = selectedKeys.includes(key);
                     return (
                       <>
-                        <CardFace card={card} />
+                        <CardFace card={card} copies={duplicateCount(card, owned)} />
                         <Button
                           className="h-[34px] rounded-full"
                           variant={already ? "secondary" : "default"}
@@ -201,7 +203,7 @@ export function ListPage({
               getKey={cardKey}
               renderItem={(card) => (
                 <>
-                  <CardFace card={card} />
+                  <CardFace card={card} copies={duplicateCount(card, owned)} />
                   <Button
                     variant="ghost"
                     className="h-[34px] rounded-full bg-white/[0.06] text-white/75 hover:bg-white/[0.11]"

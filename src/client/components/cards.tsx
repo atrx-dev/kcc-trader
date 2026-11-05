@@ -1,4 +1,5 @@
 import { type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { Copy } from "lucide-react";
 import { type Card } from "../../types.ts";
 import { frameUrl, namePlateStyle } from "../frame.ts";
 
@@ -79,14 +80,27 @@ export function FoilCard({ card, children }: { card: Card; children: ReactNode }
   );
 }
 
-export function CardFace({ card }: { card: Card }) {
+function DuplicateMark({ count }: { count: number }) {
+  return (
+    <span
+      className="duplicate-mark pointer-events-none absolute top-3 left-3 z-10 inline-flex max-w-[78%] items-center gap-1 rounded-full bg-[#f3d58f] px-1.5 py-1 text-[11px] leading-none font-bold text-[#1b1509] shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
+      aria-label={`Duplicate, ${count} copies`}
+    >
+      <Copy className="size-3 shrink-0" aria-hidden="true" />
+      <span className="duplicate-short">×{count}</span>
+      <span className="duplicate-long">{count} copies</span>
+    </span>
+  );
+}
+
+export function CardFace({ card, copies = 0 }: { card: Card; copies?: number }) {
   const holo = card.rank === "S" || card.rank === "SS" || card.rank === "SSS";
   const face = (
     <div
       className={holo ? "card framed-card foil" : "card framed-card"}
       data-rank={card.rank}
       data-sss-border={card.rank === "SSS" ? card.border || "starry" : undefined}
-      aria-label={`${card.name}, ${card.rank}, ${card.game} by ${card.creator}`}
+      aria-label={`${card.name}, ${card.rank}, ${card.game} by ${card.creator}${copies > 1 ? `, ${copies} copies` : ""}`}
     >
       {card.image ? (
         <img className="card-artwork" src={card.image} alt="" decoding="async" />
@@ -101,5 +115,10 @@ export function CardFace({ card }: { card: Card }) {
       </footer>
     </div>
   );
-  return holo ? <FoilCard card={card}>{face}</FoilCard> : face;
+  return (
+    <div className="card-stack">
+      {holo ? <FoilCard card={card}>{face}</FoilCard> : face}
+      {copies > 1 ? <DuplicateMark count={copies} /> : null}
+    </div>
+  );
 }

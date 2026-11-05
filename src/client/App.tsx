@@ -3,7 +3,7 @@ import { RotateCcw, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cardKey, type Card, type Catalog } from "../types.ts";
 import { VirtualGrid } from "./VirtualGrid.tsx";
-import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, isOwned, isDuplicate, cardsInCatalogOrder, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters } from "./model.ts";
+import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters } from "./model.ts";
 import { CardFace } from "./components/cards.tsx";
 import { formatSyncedAt, Brand, NavTabs, AccountMenu } from "./components/header.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
@@ -105,7 +105,7 @@ export function App() {
 
   const currentFilters = pageFilters[page];
   useEffect(() => {
-    if (pageFilters.forTrade.owned === "all") return;
+    if (pageFilters.forTrade.owned === "all" || pageFilters.forTrade.owned === "duplicates") return;
     setPageFilters((current) => ({ ...current, forTrade: { ...current.forTrade, owned: "all" } }));
   }, [pageFilters.forTrade.owned]);
   useEffect(() => {
@@ -433,7 +433,8 @@ export function App() {
     return pool.slice(-3);
   }, [catalog]);
   const filters = pageFilters[page];
-  const listFilters = listName === "forTrade" ? { ...filters, owned: "all" as const } : filters;
+  const listFilters =
+    listName === "forTrade" && filters.owned !== "duplicates" ? { ...filters, owned: "all" as const } : filters;
   const catalogView = listName ? null : applyFilters(cards, filters, owned, needle);
   const catalogCards = catalogView?.cards ?? [];
   const listView = listName ? applyFilters(selected, listFilters, owned, "") : null;
@@ -585,6 +586,7 @@ export function App() {
             onRetry={() => setTradesVersion((version) => version + 1)}
             onOpen={openPage}
             accepting={lists.accepting !== false}
+            owned={owned}
           />
         ) : listName ? (
           <ListPage
@@ -603,7 +605,7 @@ export function App() {
                 filters={listFilters}
                 onChange={(next) => setFiltersFor(listName, next)}
                 ownedControls={ownedControls}
-                showOwned={listName !== "forTrade"}
+                ownedChoices={listName === "forTrade" ? ["all", "duplicates"] : undefined}
                 shown={listView!.cards.length}
                 total={selected.length}
                 noun={selected.length === 1 ? "card" : "cards"}
@@ -617,6 +619,7 @@ export function App() {
             onQuery={setQuery}
             onToggle={toggle}
             unlistedDuplicates={unlistedDuplicates}
+            owned={owned}
           />
         ) : (
           <>
@@ -688,7 +691,7 @@ export function App() {
                 const onTrade = tradeKeys.has(key);
                 return (
                   <>
-                    <CardFace card={card} />
+                    <CardFace card={card} copies={duplicateCount(card, owned)} />
                     <CatalogActions
                       onWishlist={onWishlist}
                       onTrade={onTrade}

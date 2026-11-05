@@ -112,7 +112,7 @@ export interface OwnedState {
 
 export type FacetId = "rarity" | "type" | "game" | "developer";
 export type FacetSelection = Record<FacetId, string[]>;
-export type OwnedFilter = "all" | "owned" | "missing";
+export type OwnedFilter = "all" | "owned" | "missing" | "duplicates";
 
 export const FACETS: { id: FacetId; label: string; value: (card: Card) => string }[] = [
   { id: "rarity", label: "Rarity", value: (card) => card.rank },
@@ -153,7 +153,7 @@ export function loadSettings(): Settings {
   try {
     const raw = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? "null") as {
       hiddenRarities?: unknown;
-      catalogDefaults?: { facets?: Partial<Record<FacetId, unknown>>; owned?: unknown };
+      catalogDefaults?: { facets?: Partial<Record<FacetId, unknown>>; owned?: unknown; duplicates?: unknown };
       cardEffects?: unknown;
     } | null;
     if (!raw) return DEFAULT_SETTINGS;
@@ -162,7 +162,15 @@ export function loadSettings(): Settings {
     const owned = raw.catalogDefaults?.owned;
     return {
       hiddenRarities: stringList(raw.hiddenRarities),
-      catalogDefaults: { facets, owned: owned === "owned" || owned === "missing" ? owned : "all" },
+      catalogDefaults: {
+        facets,
+        owned:
+          owned === "owned" || owned === "missing" || owned === "duplicates"
+            ? owned
+            : raw.catalogDefaults?.duplicates === true
+              ? "duplicates"
+              : "all",
+      },
       cardEffects: raw.cardEffects !== false,
     };
   } catch {
@@ -178,6 +186,7 @@ export const OWNED_CHOICES: { value: OwnedFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "owned", label: "Owned" },
   { value: "missing", label: "Not owned" },
+  { value: "duplicates", label: "Duplicates" },
 ];
 
 export const NO_OWNED: OwnedState = {
@@ -241,10 +250,18 @@ export function cardsInCatalogOrder(keys: Iterable<string>, byKey: Map<string, C
   return [...byKey.values()].filter((card) => wanted.has(cardKey(card)));
 }
 
+export function duplicateCount(card: Card, owned: OwnedState): number {
+  const count =
+    card.rank === "SSS"
+      ? (owned.duplicates[`${card.id}:${card.variantId ?? ""}`] ?? 0)
+      : card.rank === "SS"
+        ? (owned.duplicates[card.id] ?? 0)
+        : 0;
+  return count > 1 ? count : 0;
+}
+
 export function isDuplicate(card: Card, owned: OwnedState): boolean {
-  if (card.rank === "SSS") return (owned.duplicates[`${card.id}:${card.variantId ?? ""}`] ?? 0) > 1;
-  if (card.rank === "SS") return (owned.duplicates[card.id] ?? 0) > 1;
-  return false;
+  return duplicateCount(card, owned) > 1;
 }
 
 export const RANK_ORDER = ["Common", "B", "A", "S", "SS", "SSS"];
@@ -307,7 +324,12 @@ export function kccTradeUrl(trader: Trader): string {
 }
 
 export const FACET_PARAMS: Record<FacetId, string> = { rarity: "rarity", type: "type", game: "game", developer: "dev" };
-export const OWNED_PARAMS: Record<OwnedFilter, string | null> = { all: null, owned: "yes", missing: "no" };
+export const OWNED_PARAMS: Record<OwnedFilter, string | null> = {
+  all: null,
+  owned: "yes",
+  missing: "no",
+  duplicates: "duplicates",
+};
 
 export function readUrlState(search: string): { query: string; filters: Filters } {
   const params = new URLSearchParams(search);
@@ -316,7 +338,14 @@ export function readUrlState(search: string): { query: string; filters: Filters 
     facets[facet.id] = [...new Set(params.getAll(FACET_PARAMS[facet.id]).filter(Boolean))];
   }
   const ownedParam = params.get("owned");
-  const owned = ownedParam === "yes" ? "owned" : ownedParam === "no" ? "missing" : "all";
+  const owned =
+    ownedParam === "yes"
+      ? "owned"
+      : ownedParam === "no"
+        ? "missing"
+        : ownedParam === "duplicates" || params.get("duplicates") === "yes"
+          ? "duplicates"
+          : "all";
   return { query: params.get("q") ?? "", filters: { facets, owned } };
 }
 
@@ -334,7 +363,7 @@ export function urlSearchFor(query: string, filters: Filters): string {
 
 export function urlHasFilters(search: string): boolean {
   const params = new URLSearchParams(search);
-  return params.has("owned") || FACETS.some((facet) => params.has(FACET_PARAMS[facet.id]));
+  return params.has("owned") || params.has("duplicates") || FACETS.some((facet) => params.has(FACET_PARAMS[facet.id]));
 }
 
 export function uniqueSorted(values: string[]): string[] {
@@ -377,18 +406,28 @@ export function facetOptionsFor(cards: Card[]): Record<FacetId, string[]> {
 }
 
 export function ownedFilterActive(filters: Filters, owned: OwnedState): boolean {
-  return owned.status === "ready" && filters.owned !== "all";
+  return owned.status === "ready" && (filters.owned === "owned" || filters.owned === "missing");
+}
+
+export function duplicatesFilterActive(filters: Filters, owned: OwnedState): boolean {
+  return owned.status === "ready" && filters.owned === "duplicates";
 }
 
 export function filtersAreActive(filters: Filters, owned: OwnedState): boolean {
-  return ownedFilterActive(filters, owned) || FACETS.some((facet) => filters.facets[facet.id].length > 0);
+  return (
+    ownedFilterActive(filters, owned) ||
+    duplicatesFilterActive(filters, owned) ||
+    FACETS.some((facet) => filters.facets[facet.id].length > 0)
+  );
 }
 
 export function applyFilters(cards: Card[], filters: Filters, owned: OwnedState, needle: string) {
   const ownedActive = ownedFilterActive(filters, owned);
+  const duplicatesActive = duplicatesFilterActive(filters, owned);
   const passes = (card: Card, skip?: FacetId) => {
     if (needle && !searchableText(card).includes(needle)) return false;
     if (ownedActive && isOwned(card, owned) !== (filters.owned === "owned")) return false;
+    if (duplicatesActive && !isDuplicate(card, owned)) return false;
     for (const facet of FACETS) {
       if (facet.id === skip) continue;
       const chosen = filters.facets[facet.id];

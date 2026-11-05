@@ -131,13 +131,16 @@ export function OwnedToggle({
   value,
   disabled,
   onChange,
+  choices = OWNED_CHOICES.map((choice) => choice.value),
   className,
 }: {
   value: OwnedFilter;
   disabled: boolean;
   onChange: (value: OwnedFilter) => void;
+  choices?: OwnedFilter[];
   className?: string;
 }) {
+  const options = OWNED_CHOICES.filter((choice) => choices.includes(choice.value));
   return (
     <div
       role="radiogroup"
@@ -148,7 +151,7 @@ export function OwnedToggle({
         className,
       )}
     >
-      {OWNED_CHOICES.map((choice) => {
+      {options.map((choice) => {
         const active = value === choice.value;
         return (
           <button
@@ -235,7 +238,7 @@ export function FilterBar({
   filters,
   onChange,
   ownedControls,
-  showOwned = true,
+  ownedChoices,
   shown,
   total,
   query,
@@ -247,7 +250,7 @@ export function FilterBar({
   filters: Filters;
   onChange: (filters: Filters) => void;
   ownedControls: OwnedControls | null;
-  showOwned?: boolean;
+  ownedChoices?: OwnedFilter[];
   shown: number | null;
   total: number;
   query?: string;
@@ -255,7 +258,7 @@ export function FilterBar({
   noun?: string;
 }) {
   const search = query?.trim() ?? "";
-  const ownedActive = showOwned && Boolean(ownedControls?.ready) && filters.owned !== "all";
+  const ownedActive = Boolean(ownedControls?.ready) && filters.owned !== "all";
   const facetsActive = FACETS.some((facet) => filters.facets[facet.id].length > 0);
   const active = Boolean(search) || ownedActive || facetsActive;
 
@@ -287,13 +290,12 @@ export function FilterBar({
         ))}
         {ownedControls ? (
           <div className="flex items-center gap-1 sm:ml-auto">
-            {showOwned ? (
-              <OwnedToggle
-                value={filters.owned}
-                disabled={!ownedControls.ready}
-                onChange={(value) => onChange({ ...filters, owned: value })}
-              />
-            ) : null}
+            <OwnedToggle
+              value={filters.owned}
+              disabled={!ownedControls.ready}
+              choices={ownedChoices}
+              onChange={(value) => onChange({ ...filters, owned: value })}
+            />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -327,7 +329,7 @@ export function FilterBar({
         {search && onClearQuery ? <FilterChip prefix="Search" label={`“${search}”`} onRemove={onClearQuery} /> : null}
         {ownedActive ? (
           <FilterChip
-            label={filters.owned === "owned" ? "Owned" : "Not owned"}
+            label={filters.owned === "owned" ? "Owned" : filters.owned === "missing" ? "Not owned" : "Duplicates"}
             onRemove={() => onChange({ ...filters, owned: "all" })}
           />
         ) : null}

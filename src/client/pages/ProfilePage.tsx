@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { cardKey, type Card } from "../../types.ts";
-import { type SessionUser, type Lists, type Trader, INACTIVE_AFTER_DAYS, daysSince, lastSeenLabel, type OwnedState, type Filters, kccTradeUrl, cardsInCatalogOrder, facetOptionsFor, filtersAreActive, applyFilters } from "../model.ts";
+import { type SessionUser, type Lists, type Trader, INACTIVE_AFTER_DAYS, daysSince, lastSeenLabel, type OwnedState, type Filters, kccTradeUrl, cardsInCatalogOrder, duplicateCount, facetOptionsFor, filtersAreActive, applyFilters } from "../model.ts";
 import { CardFace } from "../components/cards.tsx";
 import { type OwnedControls, FilterBar } from "../components/controls.tsx";
 import { EmptyState, GridSkeleton, SectionHeading, ShareListsButton } from "../components/common.tsx";
@@ -22,6 +22,7 @@ export function ProfileSection({
   highlight,
   highlightLabel,
   empty,
+  owned,
 }: {
   title: string;
   icon: LucideIcon;
@@ -30,6 +31,7 @@ export function ProfileSection({
   highlight: Set<string>;
   highlightLabel: string;
   empty: string;
+  owned: OwnedState;
 }) {
   return (
     <section className="grid gap-4">
@@ -50,7 +52,7 @@ export function ProfileSection({
             const key = cardKey(card);
             return (
               <div key={key} className="grid gap-2">
-                <CardFace card={card} />
+                <CardFace card={card} copies={duplicateCount(card, owned)} />
                 {highlight.has(key) ? (
                   <span className="justify-self-center rounded-full bg-emerald-300/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-200">
                     {highlightLabel}
@@ -216,6 +218,7 @@ export function ProfilePage({
         highlight={own ? new Set() : myWishlist}
         highlightLabel="On your wishlist"
         empty={filtering && forTrade.length > 0 ? "No cards for trade match your filters." : "Nothing listed for trade."}
+        owned={owned}
       />
       <ProfileSection
         title="Wishlist"
@@ -225,6 +228,7 @@ export function ProfilePage({
         highlight={own ? new Set() : myForTrade}
         highlightLabel="You have this for trade"
         empty={filtering && wishlist.length > 0 ? "No wishlist cards match your filters." : "Nothing on the wishlist."}
+        owned={owned}
       />
     </>
   );

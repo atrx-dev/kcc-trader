@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { cardKey, type Card } from "../../types.ts";
-import { kccTradeUrl, lastSeenLabel, type Page, type SessionUser, type Trader } from "../model.ts";
+import { duplicateCount, kccTradeUrl, lastSeenLabel, type OwnedState, type Page, type SessionUser, type Trader } from "../model.ts";
 import { CardFace } from "../components/cards.tsx";
 import { EmptyState } from "../components/common.tsx";
 
@@ -17,7 +17,7 @@ export interface ResolvedMatch {
 
 export const MATCH_PREVIEW = 8;
 
-export function MatchCards({ title, cards, tone }: { title: string; cards: Card[]; tone: string }) {
+export function MatchCards({ title, cards, tone, owned }: { title: string; cards: Card[]; tone: string; owned: OwnedState }) {
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? cards : cards.slice(0, MATCH_PREVIEW);
   return (
@@ -31,7 +31,7 @@ export function MatchCards({ title, cards, tone }: { title: string; cards: Card[
       </p>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2">
         {shown.map((card) => (
-          <CardFace key={cardKey(card)} card={card} />
+          <CardFace key={cardKey(card)} card={card} copies={duplicateCount(card, owned)} />
         ))}
       </div>
       {cards.length > MATCH_PREVIEW ? (
@@ -48,7 +48,15 @@ export function MatchCards({ title, cards, tone }: { title: string; cards: Card[
   );
 }
 
-export function TraderMatch({ match, onOpen }: { match: ResolvedMatch; onOpen: (page: Page, href: string) => void }) {
+export function TraderMatch({
+  match,
+  owned,
+  onOpen,
+}: {
+  match: ResolvedMatch;
+  owned: OwnedState;
+  onOpen: (page: Page, href: string) => void;
+}) {
   const { trader, theyHave, theyWant } = match;
   const tradeUrl = kccTradeUrl(trader);
 
@@ -85,12 +93,8 @@ export function TraderMatch({ match, onOpen }: { match: ResolvedMatch; onOpen: (
         </Button>
       </header>
       <div className="grid gap-3 md:grid-cols-2">
-        <MatchCards
-          title="They have, you want"
-          cards={theyHave}
-          tone="bg-rose-300"
-        />
-        <MatchCards title="You have, they want" cards={theyWant} tone="bg-sky-300" />
+        <MatchCards title="They have, you want" cards={theyHave} tone="bg-rose-300" owned={owned} />
+        <MatchCards title="You have, they want" cards={theyWant} tone="bg-sky-300" owned={owned} />
       </div>
     </article>
   );
@@ -105,6 +109,7 @@ export function TradesPage({
   onRetry,
   onOpen,
   accepting,
+  owned,
 }: {
   accepting: boolean;
   user: SessionUser | null;
@@ -114,6 +119,7 @@ export function TradesPage({
   needsBothLists: boolean;
   onRetry: () => void;
   onOpen: (page: Page, href: string) => void;
+  owned: OwnedState;
 }) {
   return (
     <>
@@ -201,7 +207,7 @@ export function TradesPage({
       ) : (
         <div className="grid gap-4">
           {matches.map((match) => (
-            <TraderMatch key={match.trader.id} match={match} onOpen={onOpen} />
+            <TraderMatch key={match.trader.id} match={match} owned={owned} onOpen={onOpen} />
           ))}
         </div>
       )}
