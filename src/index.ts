@@ -58,13 +58,23 @@ interface Env extends AuthEnv {
 function authorized(request: Request, env: Env): boolean {
   const token = env.SYNC_TOKEN;
   if (!token) return false;
-  const header = request.headers.get("Authorization") ?? "";
-  return header === `Bearer ${token}`;
+  const encoder = new TextEncoder();
+  const given = encoder.encode(request.headers.get("Authorization") ?? "");
+  const expected = encoder.encode(`Bearer ${token}`);
+  return given.byteLength === expected.byteLength && crypto.subtle.timingSafeEqual(given, expected);
+}
+
+function crossSite(request: Request, url: URL): boolean {
+  if (request.method === "GET" || request.method === "HEAD") return false;
+  const origin = request.headers.get("Origin");
+  if (origin !== null) return origin !== url.origin;
+  return request.headers.get("Sec-Fetch-Site") === "cross-site";
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (crossSite(request, url)) return Response.json({ error: "Cross-site request blocked" }, { status: 403 });
 
     if (url.pathname === "/api/cards" && request.method === "GET") {
       return Response.json(await readCatalog(env));
