@@ -1,0 +1,1 @@
+ALTER TABLE traders ADD COLUMN prune_wishlist INTEGER NOT NULL DEFAULT 1;

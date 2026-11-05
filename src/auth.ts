@@ -193,7 +193,11 @@ function avatarUrl(user: DiscordUser): string {
   return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
 }
 
-export async function finishDiscordLogin(request: Request, env: AuthEnv): Promise<Response> {
+export async function finishDiscordLogin(
+  request: Request,
+  env: AuthEnv,
+  onSignIn?: (user: SessionUser) => Promise<unknown>,
+): Promise<Response> {
   if (!configured(env)) return redirect("/?error=discord_config");
   const url = new URL(request.url);
   const state = url.searchParams.get("state");
@@ -213,6 +217,7 @@ export async function finishDiscordLogin(request: Request, env: AuthEnv): Promis
       avatarUrl: avatarUrl(discord),
       profile: await kccProfile(discord.id),
     };
+    await onSignIn?.(user).catch(() => undefined);
     const session = await seal(user, env.SESSION_SECRET);
     return redirect("/", [
       `${COOKIE}=${session}; ${cookieSuffix(request, SESSION_MS / 1000)}`,

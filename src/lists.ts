@@ -20,9 +20,12 @@ export interface ListChange {
   present: boolean;
 }
 
-export interface ListsResponse extends Lists {
+export interface Preferences {
   accepting: boolean;
+  pruneWishlist: boolean;
 }
+
+export interface ListsResponse extends Lists, Preferences {}
 
 export interface ListEnv {
   DB: D1Database;
@@ -36,6 +39,7 @@ export interface TraderRow {
   kcc_name: string | null;
   kcc_id: string | null;
   accepting: number;
+  prune_wishlist?: number;
 }
 
 interface EntryRow {
@@ -71,23 +75,29 @@ export function traderFromRow(row: TraderRow): Trader {
   };
 }
 
-function saveTrader(env: ListEnv, trader: Trader, accepting?: boolean): D1PreparedStatement {
+function flag(value: boolean | undefined): number | null {
+  return value === undefined ? null : Number(value);
+}
+
+function saveTrader(env: ListEnv, trader: Trader, preferences: Partial<Preferences> = {}): D1PreparedStatement {
   return env.DB.prepare(
-    `INSERT INTO traders (id, name, username, avatar_url, kcc_name, kcc_id, accepting)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, COALESCE(?7, 1))
+    `INSERT INTO traders (id, name, username, avatar_url, kcc_name, kcc_id, accepting, prune_wishlist)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, COALESCE(?7, 1), COALESCE(?8, 1))
      ON CONFLICT (id) DO UPDATE SET
        name = excluded.name,
        username = excluded.username,
        avatar_url = excluded.avatar_url,
        kcc_name = excluded.kcc_name,
        kcc_id = excluded.kcc_id,
-       accepting = COALESCE(?7, accepting)
+       accepting = COALESCE(?7, accepting),
+       prune_wishlist = COALESCE(?8, prune_wishlist)
      WHERE name IS NOT excluded.name
        OR username IS NOT excluded.username
        OR avatar_url IS NOT excluded.avatar_url
        OR kcc_name IS NOT excluded.kcc_name
        OR kcc_id IS NOT excluded.kcc_id
-       OR accepting IS NOT COALESCE(?7, accepting)`,
+       OR accepting IS NOT COALESCE(?7, accepting)
+       OR prune_wishlist IS NOT COALESCE(?8, prune_wishlist)`,
   ).bind(
     trader.id,
     trader.name,
@@ -95,13 +105,14 @@ function saveTrader(env: ListEnv, trader: Trader, accepting?: boolean): D1Prepar
     trader.avatarUrl,
     trader.kccName,
     trader.kccId,
-    accepting === undefined ? null : Number(accepting),
+    flag(preferences.accepting),
+    flag(preferences.pruneWishlist),
   );
 }
 
 function selectTrader(env: ListEnv, id: string): D1PreparedStatement {
   return env.DB.prepare(
-    "SELECT id, name, username, avatar_url, kcc_name, kcc_id, accepting FROM traders WHERE id = ?",
+    "SELECT id, name, username, avatar_url, kcc_name, kcc_id, accepting, prune_wishlist FROM traders WHERE id = ?",
   ).bind(id);
 }
 
@@ -119,7 +130,11 @@ function listsFrom(rows: EntryRow[]): Lists {
 
 function responseFrom(trader: D1Result, entries: D1Result): ListsResponse {
   const row = trader.results[0] as TraderRow | undefined;
-  return { ...listsFrom(entries.results as unknown as EntryRow[]), accepting: row?.accepting !== 0 };
+  return {
+    ...listsFrom(entries.results as unknown as EntryRow[]),
+    accepting: row?.accepting !== 0,
+    pruneWishlist: row?.prune_wishlist !== 0,
+  };
 }
 
 export async function readLists(env: ListEnv, trader: Trader): Promise<ListsResponse> {
@@ -131,9 +146,13 @@ export async function readLists(env: ListEnv, trader: Trader): Promise<ListsResp
   return responseFrom(row, entries);
 }
 
-export async function setAccepting(env: ListEnv, trader: Trader, accepting: boolean): Promise<ListsResponse> {
+export async function setPreferences(
+  env: ListEnv,
+  trader: Trader,
+  preferences: Partial<Preferences>,
+): Promise<ListsResponse> {
   const [, row, entries] = await env.DB.batch([
-    saveTrader(env, trader, accepting),
+    saveTrader(env, trader, preferences),
     selectTrader(env, trader.id),
     selectEntries(env, trader.id),
   ]);
@@ -148,6 +167,30 @@ export async function readPublicLists(
   const trader = row.results[0] as TraderRow | undefined;
   if (!trader) return null;
   return { ...responseFrom(row, entries), trader: traderFromRow(trader) };
+}
+
+export async function pruneLists(env: ListEnv, traderId: string, owns: (key: string) => boolean): Promise<Lists> {
+  const { results } = await env.DB.prepare(
+    `SELECT list_entries.list, list_entries.card_key
+     FROM list_entries JOIN traders ON traders.id = list_entries.trader_id
+     WHERE list_entries.trader_id = ?
+       AND (list_entries.list = 'forTrade' OR traders.prune_wishlist = 1)`,
+  )
+    .bind(traderId)
+    .all<EntryRow>();
+  const removed: Lists = { forTrade: [], wishlist: [] };
+  for (const { list, card_key: key } of results) {
+    if (list === "forTrade" ? !owns(key) : owns(key)) removed[list].push(key);
+  }
+  const deletes = (["forTrade", "wishlist"] as const)
+    .filter((list) => removed[list].length > 0)
+    .map((list) =>
+      env.DB.prepare(
+        "DELETE FROM list_entries WHERE trader_id = ? AND list = ? AND card_key IN (SELECT value FROM json_each(?))",
+      ).bind(traderId, list, JSON.stringify(removed[list])),
+    );
+  if (deletes.length > 0) await env.DB.batch(deletes);
+  return removed;
 }
 
 export async function changeLists(

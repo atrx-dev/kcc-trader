@@ -2,13 +2,16 @@ import { beginDiscordLogin, finishDiscordLogin, logout, readSession, type AuthEn
 import {
   changeLists,
   parseChanges,
+  pruneLists,
   readLists,
   readPublicLists,
-  setAccepting,
+  setPreferences,
   type ListChange,
+  type Lists,
+  type Preferences,
   type Trader,
 } from "./lists.ts";
-import { ownsCard, readOwned, SyncCooldownError } from "./owned.ts";
+import { ownsCard, readOwned, SyncCooldownError, type OwnedCards } from "./owned.ts";
 import { discoverHiddenCards, readCatalog, syncCatalog } from "./sync.ts";
 import { findTrades } from "./trades.ts";
 
@@ -21,6 +24,11 @@ function traderFor(user: SessionUser): Trader {
     kccName: user.profile?.name ?? null,
     kccId: user.profile?.id ?? null,
   };
+}
+
+async function pruneOwnedLists(env: Env, userId: string, owned: OwnedCards): Promise<Lists> {
+  if (!owned.complete || owned.hidden) return { forTrade: [], wishlist: [] };
+  return pruneLists(env, userId, (key) => ownsCard(owned, key));
 }
 
 interface Env extends AuthEnv {
@@ -56,7 +64,8 @@ export default {
         const owned = await readOwned(env, user.profile.id, request.method === "POST");
         const characterIds = [...owned.ss, ...owned.sss.map((key) => key.split(":")[0])];
         const catalogChanged = await discoverHiddenCards(env, characterIds).catch(() => false);
-        return Response.json({ ...owned, catalogChanged });
+        const removed = await pruneOwnedLists(env, user.id, owned);
+        return Response.json({ ...owned, catalogChanged, removed });
       } catch (error) {
         if (error instanceof SyncCooldownError) {
           return Response.json({ error: error.message, nextSyncAt: error.nextSyncAt }, { status: 429 });
@@ -82,11 +91,23 @@ export default {
     if (url.pathname === "/api/preferences" && request.method === "POST") {
       const user = await readSession(request, env);
       if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
-      const body = (await request.json().catch(() => null)) as { accepting?: unknown } | null;
-      if (typeof body?.accepting !== "boolean") {
+      const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+      const preferences: Partial<Preferences> = {};
+      for (const name of ["accepting", "pruneWishlist"] as const) {
+        const value = body?.[name];
+        if (value === undefined) continue;
+        if (typeof value !== "boolean") return Response.json({ error: "Invalid preferences" }, { status: 400 });
+        preferences[name] = value;
+      }
+      if (Object.keys(preferences).length === 0) {
         return Response.json({ error: "Invalid preferences" }, { status: 400 });
       }
-      return Response.json(await setAccepting(env, traderFor(user), body.accepting));
+      const saved = await setPreferences(env, traderFor(user), preferences);
+      if (!preferences.pruneWishlist || !user.profile) return Response.json(saved);
+      const owned = await readOwned(env, user.profile.id, false).catch(() => null);
+      const removed = owned ? await pruneOwnedLists(env, user.id, owned) : null;
+      if (!removed?.wishlist.length && !removed?.forTrade.length) return Response.json(saved);
+      return Response.json({ ...(await readLists(env, traderFor(user))), removed });
     }
 
     if (url.pathname === "/api/lists") {
@@ -127,7 +148,12 @@ export default {
     }
 
     if (url.pathname === "/auth/discord/callback" && request.method === "GET") {
-      return finishDiscordLogin(request, env);
+      return finishDiscordLogin(request, env, async (user) => {
+        if (!user.profile) return;
+        await readOwned(env, user.profile.id, true).catch((error) => {
+          if (!(error instanceof SyncCooldownError)) throw error;
+        });
+      });
     }
 
     if (url.pathname === "/auth/logout" && request.method === "POST") {

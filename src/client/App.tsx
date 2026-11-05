@@ -65,6 +65,7 @@ interface Lists {
   forTrade: string[];
   wishlist: string[];
   accepting?: boolean;
+  pruneWishlist?: boolean;
 }
 
 type ListName = "forTrade" | "wishlist";
@@ -224,15 +225,19 @@ function ownedFromResponse(data: OwnedCards): OwnedState {
 async function requestOwned(
   method: "GET" | "POST",
   signal?: AbortSignal,
-): Promise<{ state: OwnedState; catalogChanged: boolean }> {
+): Promise<{ state: OwnedState; catalogChanged: boolean; removed: Lists }> {
   const response = await fetch("/api/owned", { method, signal });
   if (response.status === 429) {
     const body = (await response.json().catch(() => null)) as { nextSyncAt?: string } | null;
     if (body?.nextSyncAt) throw new SyncCooldownError(body.nextSyncAt);
   }
   if (!response.ok) throw new Error("Could not load your collection");
-  const data = (await response.json()) as OwnedCards & { catalogChanged?: boolean };
-  return { state: ownedFromResponse(data), catalogChanged: Boolean(data.catalogChanged) };
+  const data = (await response.json()) as OwnedCards & { catalogChanged?: boolean; removed?: Lists };
+  return {
+    state: ownedFromResponse(data),
+    catalogChanged: Boolean(data.catalogChanged),
+    removed: data.removed ?? NO_LISTS,
+  };
 }
 
 function formatTime(value: string): string {
@@ -902,6 +907,8 @@ function SettingsSheet({
   ownedAvailable,
   accepting,
   onAcceptingChange,
+  pruneWishlist,
+  onPruneWishlistChange,
 }: {
   settings: Settings;
   onChange: (settings: Settings) => void;
@@ -912,6 +919,8 @@ function SettingsSheet({
   ownedAvailable: boolean;
   accepting: boolean | null;
   onAcceptingChange: (accepting: boolean) => void;
+  pruneWishlist: boolean | null;
+  onPruneWishlistChange: (pruneWishlist: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const visibleRarities = rarities.filter((rarity) => !settings.hiddenRarities.includes(rarity));
@@ -982,6 +991,29 @@ function SettingsSheet({
                 checked={accepting ?? false}
                 disabled={accepting === null}
                 onChange={onAcceptingChange}
+              />
+            </div>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 id="prune-wishlist-label" className="font-display text-base font-bold">
+                  Clear owned from Wishlist
+                </h3>
+                <p className="text-sm text-white/60">
+                  {pruneWishlist === null
+                    ? "Sign in to have cards taken off your Wishlist once you own them."
+                    : pruneWishlist
+                      ? "When your collection syncs, any card you now own is taken off your Wishlist."
+                      : "Cards you own stay on your Wishlist until you remove them yourself."}
+                </p>
+              </div>
+              <Switch
+                labelledBy="prune-wishlist-label"
+                checked={pruneWishlist ?? false}
+                disabled={pruneWishlist === null}
+                onChange={onPruneWishlistChange}
               />
             </div>
           </section>
@@ -1317,9 +1349,38 @@ function EmptyState({
   );
 }
 
-function Banner({ children }: { children: ReactNode }) {
+function Banner({
+  children,
+  tone = "error",
+  onDismiss,
+}: {
+  children: ReactNode;
+  tone?: "error" | "info";
+  onDismiss?: () => void;
+}) {
   return (
-    <p className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-red-200">{children}</p>
+    <div
+      role={tone === "error" ? "alert" : "status"}
+      className={cn(
+        "flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm",
+        tone === "error"
+          ? "border-destructive/30 bg-destructive/10 text-red-200"
+          : "border-sky-300/20 bg-sky-300/[0.07] text-sky-100",
+      )}
+    >
+      {tone === "info" ? <Info className="mt-0.5 size-4 shrink-0 text-sky-300" /> : null}
+      <p className="flex-1">{children}</p>
+      {onDismiss ? (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          className="-my-1 -mr-2 rounded-full p-1 text-current/60 transition-colors outline-none hover:bg-white/10 hover:text-current focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <X className="size-4" />
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -1394,6 +1455,7 @@ export function App() {
   const saveTimer = useRef<number | undefined>(undefined);
   const [listsSaved, setListsSaved] = useState(0);
   const [listError, setListError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [page, setPage] = useState<Page>(INITIAL_PAGE);
   const [profileId, setProfileId] = useState(() => profileIdFromPath(window.location.pathname));
   const [query, setQuery] = useState(INITIAL_URL_STATE.query);
@@ -1511,9 +1573,10 @@ export function App() {
     setOwned({ ...NO_OWNED, status: "loading" });
     const controller = new AbortController();
     requestOwned("GET", controller.signal)
-      .then(({ state, catalogChanged }) => {
+      .then(({ state, catalogChanged, removed }) => {
         setOwned(state);
         if (catalogChanged) setCatalogVersion((version) => version + 1);
+        dropRemoved(removed);
       })
       .catch((cause: unknown) => {
         if (cause instanceof DOMException && cause.name === "AbortError") return;
@@ -1547,9 +1610,10 @@ export function App() {
     setOwnedSyncFailed(false);
     setOwned((current) => ({ ...current, syncing: true }));
     try {
-      const { state, catalogChanged } = await requestOwned("POST");
+      const { state, catalogChanged, removed } = await requestOwned("POST");
       setOwned(state);
       if (catalogChanged) setCatalogVersion((version) => version + 1);
+      dropRemoved(removed);
     } catch (cause) {
       if (cause instanceof SyncCooldownError) {
         setOwned((current) => ({ ...current, nextSyncAt: cause.nextSyncAt, syncing: false }));
@@ -1579,12 +1643,35 @@ export function App() {
     setProfileId(profileIdFromPath(href));
     setQuery("");
     setListError(null);
+    setNotice(null);
     window.scrollTo({ top: 0 });
   }
 
   function receiveLists(data: Lists) {
     savedLists.current = data;
     setLists(withChanges(data, pendingChanges.current));
+  }
+
+  function dropRemoved(removed: Lists) {
+    if (removed.forTrade.length === 0 && removed.wishlist.length === 0) return;
+    const gone = { forTrade: new Set(removed.forTrade), wishlist: new Set(removed.wishlist) };
+    const saved = savedLists.current;
+    receiveLists({
+      ...saved,
+      forTrade: saved.forTrade.filter((key) => !gone.forTrade.has(key)),
+      wishlist: saved.wishlist.filter((key) => !gone.wishlist.has(key)),
+    });
+    setListsSaved((version) => version + 1);
+    const cards = (count: number) => (count === 1 ? "1 card" : `${count} cards`);
+    const parts = [
+      removed.forTrade.length > 0
+        ? `${cards(removed.forTrade.length)} from For trade that ${removed.forTrade.length === 1 ? "isn't" : "aren't"} in your KCC collection anymore`
+        : null,
+      removed.wishlist.length > 0
+        ? `${cards(removed.wishlist.length)} from your Wishlist that you now own`
+        : null,
+    ].filter(Boolean);
+    setNotice(`Removed ${parts.join(", and ")}.`);
   }
 
   function toggle(list: ListName, key: string, present: boolean) {
@@ -1657,20 +1744,22 @@ export function App() {
     };
   }, []);
 
-  async function setAccepting(accepting: boolean) {
-    const previous = lists.accepting;
-    setLists((current) => ({ ...current, accepting }));
+  async function savePreference(preference: Partial<Pick<Lists, "accepting" | "pruneWishlist">>) {
+    const previous = { accepting: lists.accepting, pruneWishlist: lists.pruneWishlist };
+    setLists((current) => ({ ...current, ...preference }));
     const response = await fetch("/api/preferences", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ accepting }),
+      body: JSON.stringify(preference),
     }).catch(() => null);
     if (!response?.ok) {
-      setLists((current) => ({ ...current, accepting: previous }));
-      setListError("Couldn't save your trading preference. Try again in a moment.");
+      setLists((current) => ({ ...current, ...previous }));
+      setListError("Couldn't save that setting. Try again in a moment.");
       return;
     }
-    receiveLists((await response.json()) as Lists);
+    const data = (await response.json()) as Lists & { removed?: Lists };
+    receiveLists(data);
+    if (data.removed) dropRemoved(data.removed);
   }
 
   function clearFilters() {
@@ -1823,7 +1912,9 @@ export function App() {
               owned={owned}
               ownedAvailable={Boolean(user?.profile)}
               accepting={user ? lists.accepting !== false : null}
-              onAcceptingChange={setAccepting}
+              onAcceptingChange={(accepting) => void savePreference({ accepting })}
+              pruneWishlist={user ? lists.pruneWishlist !== false : null}
+              onPruneWishlistChange={(pruneWishlist) => void savePreference({ pruneWishlist })}
             />
             {userLoaded ? <AccountMenu user={user} onOpen={openPage} /> : null}
           </div>
@@ -1846,7 +1937,12 @@ export function App() {
       <main className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 px-4 py-6 md:px-8 md:py-10">
         {authError ? <Banner>{authError}</Banner> : null}
         {error ? <Banner>{error}</Banner> : null}
-        {listError ? <Banner>{listError}</Banner> : null}
+        {listError ? <Banner onDismiss={() => setListError(null)}>{listError}</Banner> : null}
+        {notice ? (
+          <Banner tone="info" onDismiss={() => setNotice(null)}>
+            {notice}
+          </Banner>
+        ) : null}
 
         {page === "profile" && profileId ? (
           <ProfilePage
