@@ -31,7 +31,9 @@ export function MatchCards({ title, cards, tone, owned }: { title: string; cards
       </p>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2">
         {shown.map((card) => (
-          <CardFace key={cardKey(card)} card={card} copies={duplicateCount(card, owned)} />
+          <div key={cardKey(card)} className="trade-thumb">
+            <CardFace card={card} copies={duplicateCount(card, owned)} />
+          </div>
         ))}
       </div>
       {cards.length > MATCH_PREVIEW ? (
