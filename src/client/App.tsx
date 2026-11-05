@@ -3,7 +3,7 @@ import { RotateCcw, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cardKey, type Card, type Catalog } from "../types.ts";
 import { VirtualGrid } from "./VirtualGrid.tsx";
-import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, isOwned, isDuplicate, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters } from "./model.ts";
+import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, isOwned, isDuplicate, cardsInCatalogOrder, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters } from "./model.ts";
 import { CardFace } from "./components/cards.tsx";
 import { formatSyncedAt, Brand, NavTabs, AccountMenu } from "./components/header.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
@@ -104,6 +104,10 @@ export function App() {
   }, []);
 
   const currentFilters = pageFilters[page];
+  useEffect(() => {
+    if (pageFilters.forTrade.owned === "all") return;
+    setPageFilters((current) => ({ ...current, forTrade: { ...current.forTrade, owned: "all" } }));
+  }, [pageFilters.forTrade.owned]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const search = urlSearchFor(query, currentFilters);
@@ -407,10 +411,7 @@ export function App() {
   const byKey = useMemo(() => new Map(cards.map((card) => [cardKey(card), card])), [cards]);
   const listName: ListName | null = page === "forTrade" || page === "wishlist" ? page : null;
   const selectedKeys = listName ? lists[listName] : [];
-  const selected = selectedKeys.flatMap((key) => {
-    const card = byKey.get(key);
-    return card ? [card] : [];
-  });
+  const selected = cardsInCatalogOrder(selectedKeys, byKey);
   const needle = query.trim().toLowerCase();
   const catalogOptions = useMemo(() => facetOptionsFor(cards), [cards]);
   const heroStats = useMemo(() => {
@@ -432,9 +433,10 @@ export function App() {
     return pool.slice(-3);
   }, [catalog]);
   const filters = pageFilters[page];
+  const listFilters = listName === "forTrade" ? { ...filters, owned: "all" as const } : filters;
   const catalogView = listName ? null : applyFilters(cards, filters, owned, needle);
   const catalogCards = catalogView?.cards ?? [];
-  const listView = listName ? applyFilters(selected, filters, owned, "") : null;
+  const listView = listName ? applyFilters(selected, listFilters, owned, "") : null;
   const listOptions = listName ? facetOptionsFor(selected) : null;
   const ownedReady = owned.status === "ready";
   const unlistedDuplicates = useMemo(() => {
@@ -500,8 +502,8 @@ export function App() {
   const tradeMatches = useMemo(
     () =>
       trades.matches.flatMap((match) => {
-        const theyHave = match.theyHave.flatMap((key) => byKey.get(key) ?? []);
-        const theyWant = match.theyWant.flatMap((key) => byKey.get(key) ?? []);
+        const theyHave = cardsInCatalogOrder(match.theyHave, byKey);
+        const theyWant = cardsInCatalogOrder(match.theyWant, byKey);
         return theyHave.length > 0 && theyWant.length > 0 ? [{ trader: match.trader, theyHave, theyWant }] : [];
       }),
     [trades.matches, byKey],
@@ -592,15 +594,16 @@ export function App() {
             selected={selected}
             selectedKeys={selectedKeys}
             visible={listView!.cards}
-            filtersActive={filtersAreActive(filters, owned)}
+            filtersActive={filtersAreActive(listFilters, owned)}
             onClearFilters={() => setFiltersFor(listName, NO_FILTERS)}
             filterBar={
               <FilterBar
                 options={listOptions!}
                 counts={listView!.counts}
-                filters={filters}
+                filters={listFilters}
                 onChange={(next) => setFiltersFor(listName, next)}
                 ownedControls={ownedControls}
+                showOwned={listName !== "forTrade"}
                 shown={listView!.cards.length}
                 total={selected.length}
                 noun={selected.length === 1 ? "card" : "cards"}

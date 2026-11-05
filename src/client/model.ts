@@ -1,5 +1,5 @@
 import { ArrowLeftRight, Handshake, Heart, LayoutGrid, type LucideIcon } from "lucide-react";
-import { type Card } from "../types.ts";
+import { cardKey, type Card } from "../types.ts";
 
 export interface SessionProfile {
   id: string;
@@ -234,6 +234,11 @@ export function isOwned(card: Card, owned: OwnedState): boolean {
   if (card.rank === "SSS") return owned.sss.has(`${card.id}:${card.variantId ?? ""}`);
   if (card.rank === "SS") return owned.ss.has(card.id);
   return false;
+}
+
+export function cardsInCatalogOrder(keys: Iterable<string>, byKey: Map<string, Card>): Card[] {
+  const wanted = new Set(keys);
+  return [...byKey.values()].filter((card) => wanted.has(cardKey(card)));
 }
 
 export function isDuplicate(card: Card, owned: OwnedState): boolean {

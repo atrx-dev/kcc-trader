@@ -235,6 +235,7 @@ export function FilterBar({
   filters,
   onChange,
   ownedControls,
+  showOwned = true,
   shown,
   total,
   query,
@@ -246,6 +247,7 @@ export function FilterBar({
   filters: Filters;
   onChange: (filters: Filters) => void;
   ownedControls: OwnedControls | null;
+  showOwned?: boolean;
   shown: number | null;
   total: number;
   query?: string;
@@ -253,7 +255,7 @@ export function FilterBar({
   noun?: string;
 }) {
   const search = query?.trim() ?? "";
-  const ownedActive = Boolean(ownedControls?.ready) && filters.owned !== "all";
+  const ownedActive = showOwned && Boolean(ownedControls?.ready) && filters.owned !== "all";
   const facetsActive = FACETS.some((facet) => filters.facets[facet.id].length > 0);
   const active = Boolean(search) || ownedActive || facetsActive;
 
@@ -285,11 +287,13 @@ export function FilterBar({
         ))}
         {ownedControls ? (
           <div className="flex items-center gap-1 sm:ml-auto">
-            <OwnedToggle
-              value={filters.owned}
-              disabled={!ownedControls.ready}
-              onChange={(value) => onChange({ ...filters, owned: value })}
-            />
+            {showOwned ? (
+              <OwnedToggle
+                value={filters.owned}
+                disabled={!ownedControls.ready}
+                onChange={(value) => onChange({ ...filters, owned: value })}
+              />
+            ) : null}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
