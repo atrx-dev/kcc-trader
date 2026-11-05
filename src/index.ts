@@ -12,6 +12,7 @@ import {
   type Trader,
 } from "./lists.ts";
 import { isSpare, ownsCard, readOwned, SyncCooldownError, type OwnedResponse } from "./owned.ts";
+import { profileEmbed, withProfileMeta } from "./embed.ts";
 import { discoverHiddenCards, readCatalog, stepCatalogSync } from "./sync.ts";
 import { findTrades } from "./trades.ts";
 import { cardKey } from "./types.ts";
@@ -50,6 +51,7 @@ function changedLists(sync: ListSync | null): boolean {
 }
 
 interface Env extends AuthEnv {
+  ASSETS?: Fetcher;
   CARDS: KVNamespace;
   DB: D1Database;
   SYNC_TOKEN?: string;
@@ -189,6 +191,20 @@ export default {
 
     if (url.pathname === "/auth/logout" && request.method === "POST") {
       return logout(request);
+    }
+
+    const profilePath = url.pathname.match(/^\/u\/(\d{5,25})\/?$/);
+    if (profilePath && (request.method === "GET" || request.method === "HEAD")) {
+      const headers = new Headers(request.headers);
+      headers.delete("if-none-match");
+      headers.delete("if-modified-since");
+      const shellRequest = new Request(new URL("/index.html", url), { headers });
+      const shell = await (env.ASSETS ? env.ASSETS.fetch(shellRequest) : fetch(shellRequest));
+      if (!shell.ok || !shell.body) return shell;
+      const lists = await readPublicLists(env, profilePath[1]);
+      const pageUrl = new URL(`/u/${profilePath[1]}`, url.origin).href;
+      const document = withProfileMeta(shell, profileEmbed(lists), pageUrl);
+      return request.method === "HEAD" ? new Response(null, { status: document.status, headers: document.headers }) : document;
     }
 
     if (url.pathname === "/sync" && request.method === "POST") {

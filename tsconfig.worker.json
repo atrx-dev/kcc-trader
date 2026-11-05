@@ -5,5 +5,5 @@
     "types": ["@cloudflare/workers-types"],
     "lib": ["ES2023"]
   },
-  "include": ["src/index.ts", "src/sync.ts", "src/auth.ts", "src/lists.ts", "src/trades.ts", "src/owned.ts", "src/types.ts"]
+  "include": ["src/index.ts", "src/embed.ts", "src/sync.ts", "src/auth.ts", "src/lists.ts", "src/trades.ts", "src/owned.ts", "src/types.ts"]
 }

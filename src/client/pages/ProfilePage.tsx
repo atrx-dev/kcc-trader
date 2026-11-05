@@ -110,6 +110,19 @@ export function ProfilePage({
     return () => controller.abort();
   }, [profileId]);
 
+  useEffect(() => {
+    if (state.status !== "loading") {
+      document.title = state.lists
+        ? `${state.lists.trader.name} · KCC Trader`
+        : state.status === "missing"
+          ? "No lists here · KCC Trader"
+          : "KCC Trader";
+    }
+    return () => {
+      document.title = "KCC Trader";
+    };
+  }, [state]);
+
   if (state.status === "missing" || state.status === "error") {
     return (
       <EmptyState icon={SearchX} title={state.status === "missing" ? "No lists here" : "Couldn't load these lists"}>
