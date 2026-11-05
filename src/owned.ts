@@ -6,13 +6,14 @@ const SYNC_COOLDOWN_MS = 60 * 60 * 1000;
 export interface OwnedCards {
   ss: string[];
   sss: string[];
+  duplicates?: Record<string, number>;
   copies: number;
   hidden: boolean;
   complete: boolean;
   fetchedAt: string;
 }
 
-export type OwnedResponse = OwnedCards & { nextSyncAt: string };
+export type OwnedResponse = OwnedCards & { nextSyncAt: string; previousDuplicates?: Record<string, number> };
 
 export class SyncCooldownError extends Error {
   constructor(readonly nextSyncAt: string) {
@@ -77,22 +78,24 @@ async function fetchOwned(profileId: string): Promise<OwnedCards> {
     done = next >= pageCount || results.some(reachesUntracked);
   }
 
-  const ss = new Set<string>();
-  const sss = new Set<string>();
+  const ss = new Map<string, number>();
+  const sss = new Map<string, number>();
   let copies = 0;
   for (const page of pages) {
     for (const entry of page.cards ?? []) {
       const copy = entry.copy;
       if (!copy?.characterId || !isTracked(copy.rank)) continue;
       copies += 1;
-      if (copy.rank === "SSS") sss.add(`${copy.characterId}:${copy.variant?.id ?? ""}`);
-      else ss.add(copy.characterId);
+      const [counts, key] =
+        copy.rank === "SSS" ? [sss, `${copy.characterId}:${copy.variant?.id ?? ""}`] : [ss, copy.characterId];
+      counts.set(key, (counts.get(key) ?? 0) + 1);
     }
   }
 
   return {
-    ss: [...ss],
-    sss: [...sss],
+    ss: [...ss.keys()],
+    sss: [...sss.keys()],
+    duplicates: Object.fromEntries([...ss, ...sss].filter(([, count]) => count > 1)),
     copies,
     hidden: Boolean(first.hidden),
     complete: done,
@@ -107,6 +110,18 @@ export function ownsCard(owned: OwnedCards, key: string): boolean {
   return false;
 }
 
+function ownedKey(key: string): string | null {
+  const [id = "", variantId = "", rank = ""] = key.split(":");
+  if (rank === "SSS") return `${id}:${variantId}`;
+  if (rank === "SS") return id;
+  return null;
+}
+
+export function isSpare(duplicates: Record<string, number> | undefined, key: string): boolean {
+  const owned = ownedKey(key);
+  return owned !== null && (duplicates?.[owned] ?? 0) > 1;
+}
+
 export async function readOwned(env: OwnedEnv, profileId: string, refresh: boolean): Promise<OwnedResponse> {
   const cacheKey = `owned:${profileId}`;
   const cached = await env.CARDS.get<OwnedCards>(cacheKey, "json");
@@ -117,5 +132,5 @@ export async function readOwned(env: OwnedEnv, profileId: string, refresh: boole
   }
   const owned = await fetchOwned(profileId);
   await env.CARDS.put(cacheKey, JSON.stringify(owned));
-  return withNextSync(owned);
+  return { ...withNextSync(owned), previousDuplicates: cached?.duplicates ?? {} };
 }

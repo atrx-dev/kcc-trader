@@ -2,6 +2,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type P
 import {
   ArrowLeftRight,
   Check,
+  Copy,
   Eye,
   EyeOff,
   ExternalLink,
@@ -35,7 +36,7 @@ import {
   ComboboxTrigger,
 } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -66,6 +67,13 @@ interface Lists {
   wishlist: string[];
   accepting?: boolean;
   pruneWishlist?: boolean;
+  listDuplicates?: boolean;
+}
+
+interface ListSync {
+  removed: Lists;
+  unlisted: string[];
+  added: string[];
 }
 
 type ListName = "forTrade" | "wishlist";
@@ -96,6 +104,23 @@ interface Trader {
   avatarUrl: string;
   kccName: string | null;
   kccId?: string | null;
+  lastSeenAt?: number | null;
+}
+
+const DAY = 24 * 60 * 60 * 1000;
+const INACTIVE_AFTER_DAYS = 30;
+
+function daysSince(time: number) {
+  return Math.max(0, Math.floor((Date.now() - time) / DAY));
+}
+
+function lastSeenLabel(time: number | null | undefined) {
+  if (!time) return null;
+  const days = daysSince(time);
+  if (days === 0) return "Active today";
+  if (days === 1) return "Active yesterday";
+  if (days < 60) return `Active ${days} days ago`;
+  return `Active ${Math.floor(days / 30)} months ago`;
 }
 
 interface TradeMatch {
@@ -112,6 +137,7 @@ interface TradesState {
 interface OwnedCards {
   ss: string[];
   sss: string[];
+  duplicates?: Record<string, number>;
   hidden: boolean;
   fetchedAt: string;
   nextSyncAt: string;
@@ -121,6 +147,7 @@ interface OwnedState {
   status: "idle" | "loading" | "ready" | "hidden" | "unavailable";
   ss: Set<string>;
   sss: Set<string>;
+  duplicates: Record<string, number>;
   fetchedAt: string | null;
   nextSyncAt: string | null;
   syncing: boolean;
@@ -200,6 +227,7 @@ const NO_OWNED: OwnedState = {
   status: "idle",
   ss: new Set(),
   sss: new Set(),
+  duplicates: {},
   fetchedAt: null,
   nextSyncAt: null,
   syncing: false,
@@ -216,6 +244,7 @@ function ownedFromResponse(data: OwnedCards): OwnedState {
     status: data.hidden ? "hidden" : "ready",
     ss: new Set(data.ss),
     sss: new Set(data.sss),
+    duplicates: data.duplicates ?? {},
     fetchedAt: data.fetchedAt,
     nextSyncAt: data.nextSyncAt,
     syncing: false,
@@ -225,18 +254,18 @@ function ownedFromResponse(data: OwnedCards): OwnedState {
 async function requestOwned(
   method: "GET" | "POST",
   signal?: AbortSignal,
-): Promise<{ state: OwnedState; catalogChanged: boolean; removed: Lists }> {
+): Promise<{ state: OwnedState; catalogChanged: boolean; listSync: ListSync | null }> {
   const response = await fetch("/api/owned", { method, signal });
   if (response.status === 429) {
     const body = (await response.json().catch(() => null)) as { nextSyncAt?: string } | null;
     if (body?.nextSyncAt) throw new SyncCooldownError(body.nextSyncAt);
   }
   if (!response.ok) throw new Error("Could not load your collection");
-  const data = (await response.json()) as OwnedCards & { catalogChanged?: boolean; removed?: Lists };
+  const data = (await response.json()) as OwnedCards & { catalogChanged?: boolean; listSync?: ListSync | null };
   return {
     state: ownedFromResponse(data),
     catalogChanged: Boolean(data.catalogChanged),
-    removed: data.removed ?? NO_LISTS,
+    listSync: data.listSync ?? null,
   };
 }
 
@@ -247,6 +276,12 @@ function formatTime(value: string): string {
 function isOwned(card: Card, owned: OwnedState): boolean {
   if (card.rank === "SSS") return owned.sss.has(`${card.id}:${card.variantId ?? ""}`);
   if (card.rank === "SS") return owned.ss.has(card.id);
+  return false;
+}
+
+function isDuplicate(card: Card, owned: OwnedState): boolean {
+  if (card.rank === "SSS") return (owned.duplicates[`${card.id}:${card.variantId ?? ""}`] ?? 0) > 1;
+  if (card.rank === "SS") return (owned.duplicates[card.id] ?? 0) > 1;
   return false;
 }
 
@@ -909,6 +944,8 @@ function SettingsSheet({
   onAcceptingChange,
   pruneWishlist,
   onPruneWishlistChange,
+  listDuplicates,
+  onListDuplicatesChange,
 }: {
   settings: Settings;
   onChange: (settings: Settings) => void;
@@ -921,6 +958,8 @@ function SettingsSheet({
   onAcceptingChange: (accepting: boolean) => void;
   pruneWishlist: boolean | null;
   onPruneWishlistChange: (pruneWishlist: boolean) => void;
+  listDuplicates: boolean | null;
+  onListDuplicatesChange: (listDuplicates: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const visibleRarities = rarities.filter((rarity) => !settings.hiddenRarities.includes(rarity));
@@ -955,7 +994,8 @@ function SettingsSheet({
         <TooltipContent>Settings</TooltipContent>
       </Tooltip>
       <SheetContent
-        className="w-full gap-0 border-white/10 bg-[#1a1528] sm:max-w-md"
+        aria-describedby={undefined}
+        className="gap-0 border-white/10 bg-[#1a1528] data-[side=right]:w-full data-[side=right]:sm:max-w-md"
         onInteractOutside={(event) => {
           const target = event.target as Element | null;
           if (target?.closest?.("[data-slot=combobox-content]")) event.preventDefault();
@@ -969,155 +1009,194 @@ function SettingsSheet({
       >
         <SheetHeader className="px-6 pt-6 pb-2">
           <SheetTitle className="font-display text-xl font-bold">Settings</SheetTitle>
-          <SheetDescription>Trading is saved to your account. Everything else is saved in this browser.</SheetDescription>
         </SheetHeader>
-        <div className="flex flex-col gap-8 overflow-y-auto px-6 py-4">
-          <section className="flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 id="accepting-label" className="font-display text-base font-bold">
-                  Accepting trades
-                </h3>
-                <p className="text-sm text-white/60">
-                  {accepting === null
-                    ? "Sign in to choose whether other traders can find you."
-                    : accepting
-                      ? "You show up in other traders' matches, and your public page invites offers."
-                      : "You're hidden from other traders' matches, and your public page says you're not trading."}
-                </p>
-              </div>
-              <Switch
-                labelledBy="accepting-label"
-                checked={accepting ?? false}
-                disabled={accepting === null}
-                onChange={onAcceptingChange}
-              />
-            </div>
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 id="prune-wishlist-label" className="font-display text-base font-bold">
-                  Clear owned from Wishlist
-                </h3>
-                <p className="text-sm text-white/60">
-                  {pruneWishlist === null
-                    ? "Sign in to have cards taken off your Wishlist once you own them."
-                    : pruneWishlist
-                      ? "When your collection syncs, any card you now own is taken off your Wishlist."
-                      : "Cards you own stay on your Wishlist until you remove them yourself."}
-                </p>
-              </div>
-              <Switch
-                labelledBy="prune-wishlist-label"
-                checked={pruneWishlist ?? false}
-                disabled={pruneWishlist === null}
-                onChange={onPruneWishlistChange}
-              />
-            </div>
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 id="card-effects-label" className="font-display text-base font-bold">
-                  Card effects
-                </h3>
-                <p className="text-sm text-white/60">
-                  Foil shine and sparkles on cards. Turn off for a calmer, lighter grid.
-                </p>
-              </div>
-              <Switch
-                labelledBy="card-effects-label"
-                checked={settings.cardEffects}
-                onChange={(cardEffects) => onChange({ ...settings, cardEffects })}
-              />
-            </div>
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <div>
-              <h3 className="font-display text-base font-bold">Hidden rarities</h3>
-              <p className="text-sm text-white/60">
-                Hidden rarities disappear from the catalog, your lists, search, and every count.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {rarities.map((rarity) => {
-                const hidden = settings.hiddenRarities.includes(rarity);
-                const last = !hidden && visibleRarities.length === 1;
-                return (
-                  <button
-                    key={rarity}
-                    type="button"
-                    aria-pressed={hidden}
-                    disabled={last}
-                    title={last ? "At least one rarity has to stay visible" : undefined}
-                    onClick={() => toggleRarity(rarity)}
-                    className={cn(
-                      "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
-                      hidden
-                        ? "border-white/10 bg-transparent text-white/45 line-through"
-                        : "border-white/15 bg-white/[0.06] text-white hover:bg-white/[0.1]",
-                    )}
-                  >
-                    {hidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    {rarity}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <div>
-              <h3 className="font-display text-base font-bold">Default catalog filters</h3>
-              <p className="text-sm text-white/60">
-                Applied whenever you open the catalog without filters in the link.
-              </p>
-            </div>
-            <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
-              {FACETS.map((facet) => (
-                <Fragment key={facet.id}>
-                  <span className="text-sm font-medium text-white/70">{facet.label}</span>
-                  <FacetFilter
-                    field
-                    label={facet.label}
-                    options={options[facet.id]}
-                    counts={counts?.[facet.id] ?? new Map()}
-                    selected={defaults.facets[facet.id]}
-                    onChange={(values) => setDefaults({ ...defaults, facets: { ...defaults.facets, [facet.id]: values } })}
-                  />
-                </Fragment>
-              ))}
-              <span className="text-sm font-medium text-white/70">Owned</span>
-              {ownedAvailable ? (
-                <OwnedToggle
-                  value={defaults.owned}
-                  disabled={false}
-                  onChange={(value) => setDefaults({ ...defaults, owned: value })}
-                  className="flex w-full [&>button]:flex-1"
+        <div className="flex flex-col gap-6 overflow-y-auto px-6 pt-2 pb-6">
+          <SettingsGroup title="Trading">
+            <section className="flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h4 id="accepting-label" className="font-display text-base font-bold">
+                    Accepting trades
+                  </h4>
+                  <p className="text-sm text-white/60">
+                    {accepting === null
+                      ? "Sign in to choose whether other traders can find you."
+                      : accepting
+                        ? "You show up in other traders' matches, and your public page invites offers."
+                        : "You're hidden from other traders' matches, and your public page says you're not trading."}
+                  </p>
+                </div>
+                <Switch
+                  labelledBy="accepting-label"
+                  checked={accepting ?? false}
+                  disabled={accepting === null}
+                  onChange={onAcceptingChange}
                 />
-              ) : (
-                <p className="text-xs text-white/50">Sign in to set this default.</p>
-              )}
-            </div>
-            {defaultsActive ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="self-start rounded-full text-white/70"
-                onClick={() => setDefaults(NO_FILTERS)}
-              >
-                <RotateCcw />
-                Reset defaults
-              </Button>
-            ) : null}
-          </section>
+              </div>
+            </section>
+
+            <section className="flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h4 id="prune-wishlist-label" className="font-display text-base font-bold">
+                    Clear owned from Wishlist
+                  </h4>
+                  <p className="text-sm text-white/60">
+                    {pruneWishlist === null
+                      ? "Sign in to have cards taken off your Wishlist once you own them."
+                      : pruneWishlist
+                        ? "When your collection syncs, any card you now own is taken off your Wishlist."
+                        : "Cards you own stay on your Wishlist until you remove them yourself."}
+                  </p>
+                </div>
+                <Switch
+                  labelledBy="prune-wishlist-label"
+                  checked={pruneWishlist ?? false}
+                  disabled={pruneWishlist === null}
+                  onChange={onPruneWishlistChange}
+                />
+              </div>
+            </section>
+
+            <section className="flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h4 id="list-duplicates-label" className="font-display text-base font-bold">
+                    List duplicates for trade
+                  </h4>
+                  <p className="text-sm text-white/60">
+                    {listDuplicates === null
+                      ? "Sign in to have spare copies listed for trade when your collection syncs."
+                      : listDuplicates
+                        ? "When your collection syncs, new spare copies go on your For trade list, and come off once they're no longer spare."
+                        : "Spare copies are only listed for trade when you add them yourself."}
+                  </p>
+                </div>
+                <Switch
+                  labelledBy="list-duplicates-label"
+                  checked={listDuplicates ?? false}
+                  disabled={listDuplicates === null}
+                  onChange={onListDuplicatesChange}
+                />
+              </div>
+            </section>
+          </SettingsGroup>
+
+          <SettingsGroup title="Display">
+            <section className="flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h4 id="card-effects-label" className="font-display text-base font-bold">
+                    Card effects
+                  </h4>
+                  <p className="text-sm text-white/60">
+                    Foil shine and sparkles on cards. Turn off for a calmer, lighter grid.
+                  </p>
+                </div>
+                <Switch
+                  labelledBy="card-effects-label"
+                  checked={settings.cardEffects}
+                  onChange={(cardEffects) => onChange({ ...settings, cardEffects })}
+                />
+              </div>
+            </section>
+          </SettingsGroup>
+
+          <SettingsGroup title="Browsing">
+            <section className="flex flex-col gap-3">
+              <div>
+                <h4 className="font-display text-base font-bold">Hidden rarities</h4>
+                <p className="text-sm text-white/60">
+                  Hidden rarities disappear from the catalog, your lists, search, and every count.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {rarities.map((rarity) => {
+                  const hidden = settings.hiddenRarities.includes(rarity);
+                  const last = !hidden && visibleRarities.length === 1;
+                  return (
+                    <button
+                      key={rarity}
+                      type="button"
+                      aria-pressed={hidden}
+                      disabled={last}
+                      title={last ? "At least one rarity has to stay visible" : undefined}
+                      onClick={() => toggleRarity(rarity)}
+                      className={cn(
+                        "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+                        hidden
+                          ? "border-white/10 bg-transparent text-white/45 line-through"
+                          : "border-white/15 bg-white/[0.06] text-white hover:bg-white/[0.1]",
+                      )}
+                    >
+                      {hidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      {rarity}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="flex flex-col gap-3">
+              <div>
+                <h4 className="font-display text-base font-bold">Default catalog filters</h4>
+                <p className="text-sm text-white/60">
+                  Applied whenever you open the catalog without filters in the link.
+                </p>
+              </div>
+              <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
+                {FACETS.map((facet) => (
+                  <Fragment key={facet.id}>
+                    <span className="text-sm font-medium text-white/70">{facet.label}</span>
+                    <FacetFilter
+                      field
+                      label={facet.label}
+                      options={options[facet.id]}
+                      counts={counts?.[facet.id] ?? new Map()}
+                      selected={defaults.facets[facet.id]}
+                      onChange={(values) => setDefaults({ ...defaults, facets: { ...defaults.facets, [facet.id]: values } })}
+                    />
+                  </Fragment>
+                ))}
+                <span className="text-sm font-medium text-white/70">Owned</span>
+                {ownedAvailable ? (
+                  <OwnedToggle
+                    value={defaults.owned}
+                    disabled={false}
+                    onChange={(value) => setDefaults({ ...defaults, owned: value })}
+                      className="flex w-full [&>button]:flex-1 [&>button]:px-2"
+                  />
+                ) : (
+                  <p className="text-xs text-white/50">Sign in to set this default.</p>
+                )}
+              </div>
+              {defaultsActive ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="self-start rounded-full text-white/70"
+                  onClick={() => setDefaults(NO_FILTERS)}
+                >
+                  <RotateCcw />
+                  Reset defaults
+                </Button>
+              ) : null}
+            </section>
+          </SettingsGroup>
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className="px-1 text-xs font-semibold tracking-wider text-white/45 uppercase">{title}</h3>
+      <div className="flex flex-col divide-y divide-white/[0.06] rounded-lg border border-white/10 bg-white/[0.03] [&>section]:p-4">
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -1573,10 +1652,10 @@ export function App() {
     setOwned({ ...NO_OWNED, status: "loading" });
     const controller = new AbortController();
     requestOwned("GET", controller.signal)
-      .then(({ state, catalogChanged, removed }) => {
+      .then(({ state, catalogChanged, listSync }) => {
         setOwned(state);
         if (catalogChanged) setCatalogVersion((version) => version + 1);
-        dropRemoved(removed);
+        applyListSync(listSync);
       })
       .catch((cause: unknown) => {
         if (cause instanceof DOMException && cause.name === "AbortError") return;
@@ -1610,10 +1689,10 @@ export function App() {
     setOwnedSyncFailed(false);
     setOwned((current) => ({ ...current, syncing: true }));
     try {
-      const { state, catalogChanged, removed } = await requestOwned("POST");
+      const { state, catalogChanged, listSync } = await requestOwned("POST");
       setOwned(state);
       if (catalogChanged) setCatalogVersion((version) => version + 1);
-      dropRemoved(removed);
+      applyListSync(listSync);
     } catch (cause) {
       if (cause instanceof SyncCooldownError) {
         setOwned((current) => ({ ...current, nextSyncAt: cause.nextSyncAt, syncing: false }));
@@ -1652,26 +1731,39 @@ export function App() {
     setLists(withChanges(data, pendingChanges.current));
   }
 
-  function dropRemoved(removed: Lists) {
-    if (removed.forTrade.length === 0 && removed.wishlist.length === 0) return;
-    const gone = { forTrade: new Set(removed.forTrade), wishlist: new Set(removed.wishlist) };
+  function applyListSync(sync: ListSync | null | undefined) {
+    if (!sync) return;
+    const { removed, unlisted, added } = sync;
+    if (removed.forTrade.length + removed.wishlist.length + unlisted.length + added.length === 0) return;
+    const goneForTrade = new Set([...removed.forTrade, ...unlisted]);
+    const goneWishlist = new Set(removed.wishlist);
     const saved = savedLists.current;
+    const keptForTrade = saved.forTrade.filter((key) => !goneForTrade.has(key));
     receiveLists({
       ...saved,
-      forTrade: saved.forTrade.filter((key) => !gone.forTrade.has(key)),
-      wishlist: saved.wishlist.filter((key) => !gone.wishlist.has(key)),
+      forTrade: [...added.filter((key) => !keptForTrade.includes(key)), ...keptForTrade],
+      wishlist: saved.wishlist.filter((key) => !goneWishlist.has(key)),
     });
     setListsSaved((version) => version + 1);
+
     const cards = (count: number) => (count === 1 ? "1 card" : `${count} cards`);
-    const parts = [
+    const sentences = [];
+    if (added.length > 0) {
+      sentences.push(
+        added.length === 1 ? "Listed 1 duplicate for trade." : `Listed ${added.length} duplicates for trade.`,
+      );
+    }
+    const removals = [
       removed.forTrade.length > 0
         ? `${cards(removed.forTrade.length)} from For trade that ${removed.forTrade.length === 1 ? "isn't" : "aren't"} in your KCC collection anymore`
         : null,
-      removed.wishlist.length > 0
-        ? `${cards(removed.wishlist.length)} from your Wishlist that you now own`
+      unlisted.length > 0
+        ? `${cards(unlisted.length)} from For trade that ${unlisted.length === 1 ? "isn't a duplicate" : "aren't duplicates"} anymore`
         : null,
+      removed.wishlist.length > 0 ? `${cards(removed.wishlist.length)} from your Wishlist that you now own` : null,
     ].filter(Boolean);
-    setNotice(`Removed ${parts.join(", and ")}.`);
+    if (removals.length > 0) sentences.push(`Removed ${removals.join(", and ")}.`);
+    setNotice(sentences.join(" "));
   }
 
   function toggle(list: ListName, key: string, present: boolean) {
@@ -1744,8 +1836,12 @@ export function App() {
     };
   }, []);
 
-  async function savePreference(preference: Partial<Pick<Lists, "accepting" | "pruneWishlist">>) {
-    const previous = { accepting: lists.accepting, pruneWishlist: lists.pruneWishlist };
+  async function savePreference(preference: Partial<Pick<Lists, "accepting" | "pruneWishlist" | "listDuplicates">>) {
+    const previous = {
+      accepting: lists.accepting,
+      pruneWishlist: lists.pruneWishlist,
+      listDuplicates: lists.listDuplicates,
+    };
     setLists((current) => ({ ...current, ...preference }));
     const response = await fetch("/api/preferences", {
       method: "POST",
@@ -1757,9 +1853,9 @@ export function App() {
       setListError("Couldn't save that setting. Try again in a moment.");
       return;
     }
-    const data = (await response.json()) as Lists & { removed?: Lists };
+    const data = (await response.json()) as Lists & { listSync?: ListSync };
     receiveLists(data);
-    if (data.removed) dropRemoved(data.removed);
+    applyListSync(data.listSync);
   }
 
   function clearFilters() {
@@ -1830,6 +1926,11 @@ export function App() {
   const listView = listName ? applyFilters(selected, filters, owned, "") : null;
   const listOptions = listName ? facetOptionsFor(selected) : null;
   const ownedReady = owned.status === "ready";
+  const unlistedDuplicates = useMemo(() => {
+    if (page !== "forTrade" || !ownedReady) return [];
+    const listed = new Set(lists.forTrade);
+    return cards.filter((card) => isDuplicate(card, owned) && !listed.has(cardKey(card)));
+  }, [page, ownedReady, owned, cards, lists.forTrade]);
   const tradeUnavailableReason = !user
     ? null
     : owned.status === "loading" || owned.status === "idle"
@@ -1915,6 +2016,8 @@ export function App() {
               onAcceptingChange={(accepting) => void savePreference({ accepting })}
               pruneWishlist={user ? lists.pruneWishlist !== false : null}
               onPruneWishlistChange={(pruneWishlist) => void savePreference({ pruneWishlist })}
+              listDuplicates={user ? lists.listDuplicates === true : null}
+              onListDuplicatesChange={(listDuplicates) => void savePreference({ listDuplicates })}
             />
             {userLoaded ? <AccountMenu user={user} onOpen={openPage} /> : null}
           </div>
@@ -1999,6 +2102,7 @@ export function App() {
             query={query}
             onQuery={setQuery}
             onToggle={toggle}
+            unlistedDuplicates={unlistedDuplicates}
           />
         ) : (
           <>
@@ -2263,6 +2367,8 @@ function ProfilePage({
   const { trader } = state.lists;
   const own = user?.id === trader.id;
   const accepting = own ? myAccepting : state.lists.accepting !== false;
+  const lastSeen = own ? null : lastSeenLabel(trader.lastSeenAt);
+  const inactive = !own && trader.lastSeenAt != null && daysSince(trader.lastSeenAt) >= INACTIVE_AFTER_DAYS;
   const forTrade = state.lists.forTrade.flatMap((key) => byKey.get(key) ?? []);
   const wishlist = state.lists.wishlist.flatMap((key) => byKey.get(key) ?? []);
   const combined = [...new Set([...forTrade, ...wishlist])];
@@ -2285,10 +2391,16 @@ function ProfilePage({
                 Not accepting trades
               </span>
             )}
+            {accepting && inactive ? (
+              <span className="rounded-full bg-white/[0.08] px-2.5 py-0.5 font-sans text-xs font-semibold tracking-normal text-white/70">
+                Inactive
+              </span>
+            ) : null}
           </h1>
           <p className="truncate text-sm text-white/60">
             @{trader.username}
             {trader.kccName ? ` · ${trader.kccName} on KCC` : ""}
+            {lastSeen ? ` · ${lastSeen}` : ""}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -2404,6 +2516,7 @@ function TraderMatch({ match, onOpen }: { match: ResolvedMatch; onOpen: (page: P
           <p className="truncate text-sm text-white/55">
             @{trader.username}
             {trader.kccName ? ` · ${trader.kccName} on KCC` : ""}
+            {trader.lastSeenAt ? ` · ${lastSeenLabel(trader.lastSeenAt)}` : ""}
           </p>
         </div>
         <Button asChild size="sm" className="rounded-full bg-emerald-300 text-emerald-950 hover:bg-emerald-200">
@@ -2556,6 +2669,7 @@ function ListPage({
   query,
   onQuery,
   onToggle,
+  unlistedDuplicates,
 }: {
   list: ListName;
   user: SessionUser | null;
@@ -2573,6 +2687,7 @@ function ListPage({
   query: string;
   onQuery: (value: string) => void;
   onToggle: (list: ListName, key: string, present: boolean) => void;
+  unlistedDuplicates: Card[];
 }) {
   const copy = LIST_COPY[list];
   const Icon = copy.icon;
@@ -2680,6 +2795,25 @@ function ListPage({
               </p>
             ) : null}
           </section>
+
+          {unlistedDuplicates.length > 0 ? (
+            <section className="flex flex-wrap items-center gap-3 rounded-3xl border border-sky-300/20 bg-sky-300/[0.06] px-4 py-3 md:px-5">
+              <Copy className="size-5 shrink-0 text-sky-300" />
+              <p className="min-w-0 flex-1 text-sm text-white/75">
+                {unlistedDuplicates.length === 1
+                  ? "You have a duplicate that isn't listed for trade yet."
+                  : `You have ${unlistedDuplicates.length} duplicates that aren't listed for trade yet.`}
+              </p>
+              <Button
+                size="sm"
+                className="rounded-full bg-sky-300 text-sky-950 hover:bg-sky-200"
+                onClick={() => unlistedDuplicates.forEach((card) => onToggle(list, cardKey(card), true))}
+              >
+                <Plus />
+                {unlistedDuplicates.length === 1 ? "List it" : "List them"}
+              </Button>
+            </section>
+          ) : null}
 
           <SectionHeading title="On your list" />
           {selected.length > 0 ? filterBar : null}

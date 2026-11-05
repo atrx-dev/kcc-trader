@@ -2,18 +2,19 @@ import { beginDiscordLogin, finishDiscordLogin, logout, readSession, type AuthEn
 import {
   changeLists,
   parseChanges,
-  pruneLists,
   readLists,
   readPublicLists,
   setPreferences,
+  syncLists,
   type ListChange,
-  type Lists,
+  type ListSync,
   type Preferences,
   type Trader,
 } from "./lists.ts";
-import { ownsCard, readOwned, SyncCooldownError, type OwnedCards } from "./owned.ts";
+import { isSpare, ownsCard, readOwned, SyncCooldownError, type OwnedResponse } from "./owned.ts";
 import { discoverHiddenCards, readCatalog, syncCatalog } from "./sync.ts";
 import { findTrades } from "./trades.ts";
+import { cardKey } from "./types.ts";
 
 function traderFor(user: SessionUser): Trader {
   return {
@@ -26,9 +27,26 @@ function traderFor(user: SessionUser): Trader {
   };
 }
 
-async function pruneOwnedLists(env: Env, userId: string, owned: OwnedCards): Promise<Lists> {
-  if (!owned.complete || owned.hidden) return { forTrade: [], wishlist: [] };
-  return pruneLists(env, userId, (key) => ownsCard(owned, key));
+async function syncOwnedLists(
+  env: Env,
+  userId: string,
+  owned: OwnedResponse,
+  allDuplicatesNew = false,
+): Promise<ListSync | null> {
+  if (!owned.complete || owned.hidden) return null;
+  const duplicates =
+    Object.keys(owned.duplicates ?? {}).length > 0
+      ? (await readCatalog(env)).cards.map(cardKey).filter((key) => isSpare(owned.duplicates, key))
+      : [];
+  const previous = allDuplicatesNew ? {} : owned.previousDuplicates;
+  const newDuplicates = previous ? duplicates.filter((key) => !isSpare(previous, key)) : [];
+  return syncLists(env, userId, (key) => ownsCard(owned, key), duplicates, newDuplicates);
+}
+
+function changedLists(sync: ListSync | null): boolean {
+  return Boolean(
+    sync && (sync.removed.forTrade.length || sync.removed.wishlist.length || sync.unlisted.length || sync.added.length),
+  );
 }
 
 interface Env extends AuthEnv {
@@ -64,8 +82,9 @@ export default {
         const owned = await readOwned(env, user.profile.id, request.method === "POST");
         const characterIds = [...owned.ss, ...owned.sss.map((key) => key.split(":")[0])];
         const catalogChanged = await discoverHiddenCards(env, characterIds).catch(() => false);
-        const removed = await pruneOwnedLists(env, user.id, owned);
-        return Response.json({ ...owned, catalogChanged, removed });
+        const listSync = await syncOwnedLists(env, user.id, owned);
+        const { previousDuplicates: _, ...cards } = owned;
+        return Response.json({ ...cards, catalogChanged, listSync });
       } catch (error) {
         if (error instanceof SyncCooldownError) {
           return Response.json({ error: error.message, nextSyncAt: error.nextSyncAt }, { status: 429 });
@@ -93,7 +112,7 @@ export default {
       if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
       const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
       const preferences: Partial<Preferences> = {};
-      for (const name of ["accepting", "pruneWishlist"] as const) {
+      for (const name of ["accepting", "pruneWishlist", "listDuplicates"] as const) {
         const value = body?.[name];
         if (value === undefined) continue;
         if (typeof value !== "boolean") return Response.json({ error: "Invalid preferences" }, { status: 400 });
@@ -103,11 +122,11 @@ export default {
         return Response.json({ error: "Invalid preferences" }, { status: 400 });
       }
       const saved = await setPreferences(env, traderFor(user), preferences);
-      if (!preferences.pruneWishlist || !user.profile) return Response.json(saved);
+      if (!(preferences.pruneWishlist || preferences.listDuplicates) || !user.profile) return Response.json(saved);
       const owned = await readOwned(env, user.profile.id, false).catch(() => null);
-      const removed = owned ? await pruneOwnedLists(env, user.id, owned) : null;
-      if (!removed?.wishlist.length && !removed?.forTrade.length) return Response.json(saved);
-      return Response.json({ ...(await readLists(env, traderFor(user))), removed });
+      const listSync = owned ? await syncOwnedLists(env, user.id, owned, preferences.listDuplicates) : null;
+      if (!changedLists(listSync)) return Response.json(saved);
+      return Response.json({ ...(await readLists(env, traderFor(user))), listSync });
     }
 
     if (url.pathname === "/api/lists") {
@@ -150,9 +169,11 @@ export default {
     if (url.pathname === "/auth/discord/callback" && request.method === "GET") {
       return finishDiscordLogin(request, env, async (user) => {
         if (!user.profile) return;
-        await readOwned(env, user.profile.id, true).catch((error) => {
+        const owned = await readOwned(env, user.profile.id, true).catch((error) => {
           if (!(error instanceof SyncCooldownError)) throw error;
+          return null;
         });
+        if (owned) await syncOwnedLists(env, user.id, owned);
       });
     }
 
