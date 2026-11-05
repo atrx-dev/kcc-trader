@@ -1,5 +1,5 @@
 const ORIGIN = "https://koi-card-collector.com";
-const MAX_PAGES = 45;
+const MAX_PAGES = 40;
 const POOL = 6;
 const SYNC_COOLDOWN_MS = 60 * 60 * 1000;
 

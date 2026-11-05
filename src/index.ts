@@ -12,7 +12,7 @@ import {
   type Trader,
 } from "./lists.ts";
 import { isSpare, ownsCard, readOwned, SyncCooldownError, type OwnedResponse } from "./owned.ts";
-import { discoverHiddenCards, readCatalog, syncCatalog } from "./sync.ts";
+import { discoverHiddenCards, readCatalog, stepCatalogSync } from "./sync.ts";
 import { findTrades } from "./trades.ts";
 import { cardKey } from "./types.ts";
 
@@ -196,12 +196,7 @@ export default {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
       }
       try {
-        const catalog = await syncCatalog(env);
-        return Response.json({
-          ok: true,
-          syncedAt: catalog.syncedAt,
-          count: catalog.cards.length,
-        });
+        return Response.json(await stepCatalogSync(env, url.searchParams.has("restart")));
       } catch (error) {
         const message = error instanceof Error ? error.message : "Sync failed";
         return Response.json({ error: message }, { status: 502 });
@@ -212,6 +207,6 @@ export default {
   },
 
   async scheduled(_controller, env, ctx) {
-    ctx.waitUntil(syncCatalog(env));
+    ctx.waitUntil(stepCatalogSync(env));
   },
 } satisfies ExportedHandler<Env>;

@@ -8,23 +8,24 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*", "/auth/*", "/sync"]
   },
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "kcc.atrx.dev", "custom_domain": true }],
   "kv_namespaces": [
     {
       "binding": "CARDS",
-      // Replace with the id from `npx wrangler kv namespace create CARDS` before deploying.
-      "id": "placeholder"
+      "id": "8b7acc55a98e46faa665f4b07b35b619"
     }
   ],
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "kcc-trader",
-      // Replace with the id from `npx wrangler d1 create kcc-trader` before deploying.
-      "database_id": "placeholder",
+      "database_id": "a18ed638-73ba-4beb-a1e5-703bdfeab28b",
       "migrations_dir": "migrations"
     }
   ],
   "triggers": {
-    "crons": ["0 4 * * *"]
+    "crons": ["*/5 * * * *"]
   }
 }
