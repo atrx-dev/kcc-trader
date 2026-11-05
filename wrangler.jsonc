@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "kcc-trader",
+  "compatibility_date": "2026-11-04",
+  "main": "./src/index.ts",
+  "upload_source_maps": true,
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/auth/*", "/sync", "/media/*"]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "CARDS",
+      // Replace with the id from `npx wrangler kv namespace create CARDS` before deploying.
+      "id": "placeholder"
+    }
+  ],
+  "triggers": {
+    "crons": ["0 4 * * *"]
+  }
+}

@@ -1,0 +1,541 @@
+@font-face {
+  font-family: "Orbitron Card";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/orbitron-bold.woff2") format("woff2");
+}
+
+.virtual-grid {
+  margin: 8px 0 0;
+  overflow-anchor: none;
+}
+
+.virtual-grid > div {
+  position: relative;
+  width: 100%;
+}
+
+.virtual-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: grid;
+  column-gap: 16px;
+  align-items: start;
+}
+
+.virtual-grid[data-scrolling] .foil-sample {
+  transition: none;
+  transform: none;
+  box-shadow: none;
+}
+
+.virtual-grid[data-scrolling] .foil {
+  box-shadow: none;
+}
+
+.virtual-grid[data-scrolling] .foil-treatment,
+.foil-sample[data-effects="false"] .foil-treatment {
+  display: none;
+}
+
+.foil-sample[data-paused="true"],
+.foil-sample[data-effects="false"] {
+  transition: none;
+  transform: none;
+}
+
+.entry {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.entry-actions {
+  display: grid;
+  gap: 6px;
+}
+
+.card {
+  aspect-ratio: 2 / 3;
+  width: 100%;
+  margin: 0;
+  position: relative;
+  overflow: hidden;
+  background: #242837;
+}
+
+.card img,
+.art-fallback {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+}
+
+.framed-card {
+  border: 0;
+  border-radius: 0;
+  container-type: inline-size;
+}
+
+.card .card-border {
+  object-fit: fill;
+  z-index: 1;
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+}
+
+.framed-card footer {
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  position: absolute;
+  inset: 84% 3% 2% 27%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  text-shadow: 0 1px 3px #000b;
+}
+
+.framed-card footer strong {
+  flex-shrink: 0;
+  overflow: hidden;
+  font-size: min(6cqw, 26px);
+  font-weight: 700;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.framed-card footer span {
+  flex-shrink: 0;
+  overflow: hidden;
+  margin-top: 0.4cqw;
+  color: #fff;
+  font-size: min(3.8cqw, 16px);
+  font-weight: 500;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.framed-card[data-rank="SS"] footer {
+  left: 35%;
+}
+
+.framed-card[data-rank="SSS"] footer {
+  left: 40%;
+}
+
+.framed-card:is([data-rank="S"], [data-rank="SS"], [data-rank="SSS"]) footer,
+.framed-card:is([data-rank="S"], [data-rank="SS"], [data-rank="SSS"]) footer span {
+  color: #242237;
+  text-shadow: 0 1px 2px #ffffffb3;
+}
+
+.framed-card footer strong {
+  letter-spacing: -0.04em;
+  color: #fff;
+  -webkit-text-stroke: 1px #10121b;
+  paint-order: stroke fill;
+  text-shadow: 0.5px 1px #2667c4;
+  font-family: "Orbitron Card", "Outfit Variable", sans-serif;
+  font-weight: 700;
+}
+
+.framed-card[data-rank="SSS"]:not([data-sss-border="starry"]) footer {
+  width: 54%;
+  left: 43%;
+}
+
+.framed-card:is([data-sss-border="noir"], [data-sss-border="red-luxury"]) footer,
+.framed-card:is([data-sss-border="noir"], [data-sss-border="red-luxury"]) footer span {
+  color: #f5f5f5;
+  text-shadow: 0 1px 2px #000;
+}
+
+.framed-card[data-sss-border^="halloween-"] footer,
+.framed-card[data-sss-border^="halloween-"] footer span {
+  color: #f7f4ec;
+  text-shadow: 0 1px 3px #000;
+}
+
+.framed-card:is([data-sss-border="halloween-2"], [data-sss-border="halloween-5"]) footer,
+.framed-card:is([data-sss-border="halloween-2"], [data-sss-border="halloween-5"]) footer span {
+  color: #242327;
+  text-shadow: 0 1px 2px #fff9;
+}
+
+.foil {
+  box-shadow: 0 0 24px #c5f27718;
+}
+
+.foil-stage {
+  width: 100%;
+  perspective: 1100px;
+  padding: 4px;
+}
+
+.foil-sample {
+  isolation: isolate;
+  position: relative;
+  border-radius: 5px;
+  transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transition: transform 0.18s ease-out, box-shadow 0.3s;
+  box-shadow: 0 15px 35px #0007;
+}
+
+.foil-sample .card {
+  margin: 0;
+}
+
+.foil-sample .card footer {
+  z-index: 5;
+}
+
+.foil-treatment {
+  pointer-events: none;
+  z-index: 3;
+  opacity: var(--foil-strength, 0.55);
+  border-radius: 5px;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.foil-treatment > div {
+  position: absolute;
+  inset: 0;
+}
+
+.foil-sample[data-frame-only="true"] .foil-treatment {
+  -webkit-mask-image: var(--foil-frame);
+  mask-image: var(--foil-frame);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+.foil-sample[data-frame-only="false"] .foil-treatment {
+  -webkit-mask-image: linear-gradient(#000 0% 77%, #0000 84%);
+  mask-image: linear-gradient(#000 0% 77%, #0000 84%);
+}
+
+.foil-sweep {
+  mix-blend-mode: screen;
+  background: linear-gradient(115deg, #0000 30%, #cbdbea33 43%, #ffffffd9 49%, #d4e8ff55 53%, #0000 62%) 0 0 / 300% 200%;
+  animation: 7s ease-in-out infinite foil-sweep;
+}
+
+.foil-glare {
+  background: radial-gradient(ellipse at var(--foil-x, 55%) var(--foil-y, 25%), #fff9, transparent 55%);
+  opacity: 0.22;
+  mix-blend-mode: screen;
+}
+
+.foil-color {
+  mix-blend-mode: color-dodge;
+  opacity: 0.24;
+  background: linear-gradient(125deg, #92bfd733, #0000 40%, #f7fafdaa 55%, #0000 70%);
+}
+
+.foil-grain {
+  opacity: 0;
+}
+
+.foil-sample[data-tier="SS"] .foil-sweep {
+  background-image: linear-gradient(115deg, #0000 30%, #edb64133 42%, #fff4cce0 49%, #ffd77966 55%, #0000 64%);
+  animation-duration: 6s;
+}
+
+.foil-sample[data-tier="SS"] .foil-color {
+  opacity: 0.3;
+  background: repeating-linear-gradient(125deg, #fff7c344 0%, #eaa84f55 15%, #bd91d944 25%, #b6edd533 35%, #fff7c344 50%) 0 0 / 220% 220%;
+  animation: 12s ease-in-out infinite alternate foil-opal;
+}
+
+.foil-sample[data-tier="SS"] .foil-grain {
+  opacity: 0.2;
+  mix-blend-mode: screen;
+  background: repeating-linear-gradient(35deg, #0000 0 3px, #ffe8b755 4px, #0000 5px 9px);
+}
+
+.foil-sample[data-tier="SSS"] .foil-sweep {
+  background-image: linear-gradient(115deg, #0000 30%, #d0efff55 43%, #fff9f4ed 49%, #ffc8ea66 55%, #0000 67%);
+  animation-duration: 8s;
+}
+
+.foil-sample[data-tier="SSS"] .foil-color {
+  opacity: 0.44;
+  mix-blend-mode: soft-light;
+  background: linear-gradient(125deg, #a9e8f977, #e6c0ff88, #ffd5e977, #f9f2be77, #b8efd977, #bacdff88, #e6c0ff88) 0 0 / 300% 300%;
+  animation: 9s ease-in-out infinite alternate foil-opal;
+}
+
+.foil-sample:is([data-tier="SS"], [data-tier="SSS"]) .foil-glare {
+  opacity: 0.15;
+}
+
+.foil-sample:is([data-tier="SS"], [data-tier="SSS"]) .foil-sweep {
+  opacity: 0.8;
+}
+
+.foil-sample[data-tier="SSS"] .foil-grain {
+  opacity: 0.15;
+  mix-blend-mode: screen;
+  background: repeating-linear-gradient(135deg, #fff7 0 1px, #0000 1px 7px);
+}
+
+.foil-stars i {
+  display: block;
+  position: absolute;
+  clip-path: polygon(50% 0, 61% 38%, 100% 50%, 61% 62%, 50% 100%, 39% 62%, 0 50%, 39% 38%);
+  filter: drop-shadow(0 0 4px #e6c6ff);
+  background: #fffff2;
+  animation: 4.7s ease-in-out infinite foil-twinkle;
+}
+
+.foil-sample[data-holo="noir"] .foil-color {
+  opacity: 0.18;
+  mix-blend-mode: screen;
+  background: linear-gradient(125deg, #0000 15%, #d4e0ee66 45%, #a9b5c422 65%, #0000) 0 0 / 250% 250%;
+  animation-duration: 14s;
+}
+
+.foil-sample[data-holo="noir"] .foil-grain {
+  opacity: 0.1;
+  background: repeating-linear-gradient(115deg, #0000 0 5px, #dce7f955 6px, #0000 7px 12px);
+}
+
+.foil-sample[data-holo="noir"] .foil-stars i {
+  clip-path: polygon(50% 0, 78% 50%, 50% 100%, 22% 50%);
+  filter: drop-shadow(0 0 2px #a9bdd9);
+  background: #e4ebf6;
+  width: 5px !important;
+  height: 9px !important;
+}
+
+.foil-sample[data-holo="noir"] .foil-stars i:nth-child(2n) {
+  display: none;
+}
+
+.foil-sample[data-holo="marble"] .foil-sweep {
+  opacity: 0.65;
+  background-image: linear-gradient(120deg, #0000 27%, #f9e8bb33 44%, #fffaf3bb 50%, #efd49b44 57%, #0000 70%);
+  animation-duration: 11s;
+}
+
+.foil-sample[data-holo="marble"] .foil-stars i {
+  filter: drop-shadow(0 0 3px #edc77b);
+  background: #fff1cb;
+  animation-duration: 6s;
+  width: 6px !important;
+  height: 6px !important;
+}
+
+.foil-sample[data-holo="marble"] .foil-stars i:nth-child(3n) {
+  display: none;
+}
+
+.foil-sample[data-holo="graffiti"] .foil-color {
+  opacity: 0.32;
+  mix-blend-mode: soft-light;
+  background: repeating-linear-gradient(120deg, #00eaffaa 0%, #7964ff77 15%, #ff39db99 30%, #0000 40%, #00eaffaa 55%) 0 0 / 260% 260%;
+  animation-duration: 7s;
+}
+
+.foil-sample[data-holo="graffiti"] .foil-grain {
+  opacity: 0.2;
+  background-image: radial-gradient(#13eeffbb 1px, #0000 1.8px), radial-gradient(#ff55e599 1px, #0000 1.7px);
+  background-position: 0 0, 12px 18px;
+  background-size: 27px 31px, 37px 43px;
+}
+
+.foil-sample[data-holo="graffiti"] .foil-stars i {
+  clip-path: none;
+  filter: drop-shadow(0 0 3px #16dcff);
+  background: #41f5ff;
+  border-radius: 50%;
+  animation-duration: 3.8s;
+  width: 5px !important;
+  height: 5px !important;
+}
+
+.foil-sample[data-holo="graffiti"] .foil-stars i:nth-child(2n) {
+  filter: drop-shadow(0 0 3px #ff35d6);
+  background: #ff63dd;
+}
+
+.foil-sample[data-holo="sketch"] .foil-sweep {
+  opacity: 0.52;
+  background-image: linear-gradient(118deg, #0000 39%, #d7dfe222 46%, #fffdf5bb 49%, #adb6c033 52%, #0000 59%);
+  animation-duration: 12s;
+}
+
+.foil-sample[data-holo="sketch"] .foil-glare {
+  opacity: 0.1;
+  background: radial-gradient(ellipse at var(--foil-x, 55%) var(--foil-y, 25%), #fffdf4aa, transparent 50%);
+}
+
+.foil-sample[data-holo="sketch"] .foil-stars i {
+  filter: drop-shadow(0 0 1px #9da7b5);
+  background: #f2f3f6;
+  animation-duration: 7s;
+  width: 7px !important;
+  height: 7px !important;
+}
+
+.foil-sample[data-holo="sketch"] .foil-stars i:nth-child(2n) {
+  display: none;
+}
+
+.foil-sample[data-holo="red-luxury"] .foil-sweep {
+  opacity: 0.68;
+  background-image: linear-gradient(116deg, #0000 32%, #b8762822 43%, #f7d98288 47%, #fff7d5dd 49%, #d5a23c55 53%, #0000 64%);
+  animation-duration: 10s;
+}
+
+.foil-sample[data-holo="red-luxury"] .foil-glare {
+  opacity: 0.14;
+  background: radial-gradient(ellipse at var(--foil-x, 55%) var(--foil-y, 25%), #fff0bd99, transparent 52%);
+}
+
+.foil-sample[data-holo="red-luxury"] .foil-stars i {
+  filter: drop-shadow(0 0 3px #e6b44e);
+  background: #fff0c4;
+  animation-duration: 6.5s;
+  width: 6px !important;
+  height: 9px !important;
+}
+
+.foil-sample[data-holo="red-luxury"] .foil-stars i:nth-child(3n) {
+  display: none;
+}
+
+.foil-sample[data-holo="besties"] .foil-treatment {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.foil-sample[data-holo="besties"] .foil-color {
+  opacity: 0.24;
+  background: repeating-linear-gradient(125deg, #ffe79a33 0%, #e6a53522 18%, #fff9dc77 30%, #d8b86a22 42%, #ffe79a33 60%) 0 0 / 240% 240%;
+  animation-duration: 13s;
+}
+
+.foil-sample[data-holo="besties"] .foil-sweep {
+  opacity: 0.92;
+  background-image: linear-gradient(115deg, #0000 32%, #edb64122 41%, #fff0ae99 47%, #fffcebe0 49%, #f6d77955 53%, #0000 62%);
+  animation-duration: 7.5s;
+}
+
+.foil-sample[data-holo="besties"] .foil-grain {
+  opacity: 0.14;
+  background: repeating-linear-gradient(35deg, #0000 0 3px, #ffefc155 4px, #0000 5px 10px);
+}
+
+.foil-sample[data-holo="besties"] .foil-glare {
+  opacity: 0.18;
+  background: radial-gradient(ellipse at var(--foil-x, 55%) var(--foil-y, 25%), #fff6d9aa, transparent 52%);
+}
+
+.foil-sample[data-holo="besties"] .foil-stars i {
+  filter: drop-shadow(0 0 3px #f6cc63);
+  background: #fff6ce;
+  animation-duration: 5.7s;
+  width: 6px !important;
+  height: 6px !important;
+}
+
+.foil-sample[data-holo^="halloween-"] {
+  --halloween-shine: 255, 191, 82;
+}
+
+.foil-sample[data-holo="halloween-2"] { --halloween-shine: 255, 249, 198; }
+.foil-sample[data-holo="halloween-3"] { --halloween-shine: 225, 64, 58; }
+.foil-sample[data-holo="halloween-4"] { --halloween-shine: 218, 228, 244; }
+.foil-sample[data-holo="halloween-5"] { --halloween-shine: 234, 211, 165; }
+.foil-sample[data-holo="halloween-6"] { --halloween-shine: 165, 219, 255; }
+.foil-sample[data-holo="halloween-7"] { --halloween-shine: 175, 137, 226; }
+.foil-sample[data-holo="halloween-8"] { --halloween-shine: 244, 103, 129; }
+.foil-sample[data-holo="halloween-9"] { --halloween-shine: 174, 224, 204; }
+.foil-sample[data-holo="halloween-10"] { --halloween-shine: 209, 217, 225; }
+
+.foil-sample[data-holo^="halloween-"] .foil-stars {
+  display: none;
+}
+
+.foil-sample[data-holo^="halloween-"] .foil-sweep {
+  opacity: 0.44;
+  background-image: linear-gradient(115deg, transparent 38%, rgba(var(--halloween-shine), 0.15) 46%, rgba(var(--halloween-shine), 0.65) 50%, rgba(var(--halloween-shine), 0.12) 54%, transparent 62%);
+  animation-duration: 13s;
+}
+
+.foil-sample[data-holo^="halloween-"] .foil-color {
+  opacity: 0.1;
+  mix-blend-mode: screen;
+  background: radial-gradient(ellipse at 35% 80%, rgba(var(--halloween-shine), 0.45), transparent 65%);
+  animation: none;
+}
+
+.foil-sample[data-holo^="halloween-"] .foil-glare {
+  opacity: 0.07;
+}
+
+.foil-sample[data-holo^="halloween-"] .foil-grain {
+  opacity: 0.035;
+  background: repeating-linear-gradient(130deg, rgba(var(--halloween-shine), 0.45) 0 1px, transparent 1px 14px);
+}
+
+.foil-sample:is([data-holo="halloween-4"], [data-holo="halloween-9"], [data-holo="halloween-10"]) .foil-grain {
+  background: repeating-radial-gradient(ellipse at 75% 45%, transparent 0 25px, rgba(var(--halloween-shine), 0.4) 27px, transparent 30px 65px);
+}
+
+.foil-sample[data-holo="halloween-6"] .foil-sweep {
+  background-image: linear-gradient(135deg, transparent 40%, rgba(var(--halloween-shine), 0.55) 49%, transparent 53%);
+}
+
+@keyframes foil-sweep {
+  0%,
+  12% { background-position: 130% 0; }
+  75%,
+  100% { background-position: -30% 100%; }
+}
+
+@keyframes foil-opal {
+  0% { background-position: 0 30%; }
+  100% { background-position: 100% 80%; }
+}
+
+@keyframes foil-twinkle {
+  0%,
+  100% { opacity: 0.12; transform: scale(0.55); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .foil-sample {
+    transition: none;
+    transform: none !important;
+  }
+
+  .foil-treatment * {
+    animation: none !important;
+  }
+
+  .foil-sweep {
+    background-position: 50%;
+  }
+
+  .foil-stars i {
+    opacity: 0.55;
+  }
+}
