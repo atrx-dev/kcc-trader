@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { cardKey, type Card } from "../../types.ts";
 import { type SessionUser, type Lists, type Trader, INACTIVE_AFTER_DAYS, daysSince, lastSeenLabel, type OwnedState, type Filters, kccTradeUrl, cardsInCatalogOrder, duplicateCount, facetOptionsFor, filtersAreActive, applyFilters } from "../model.ts";
+import { VirtualGrid } from "../VirtualGrid.tsx";
 import { CardFace } from "../components/cards.tsx";
 import { type OwnedControls, FilterBar } from "../components/controls.tsx";
 import { EmptyState, GridSkeleton, SectionHeading, ShareListsButton } from "../components/common.tsx";
@@ -47,21 +48,24 @@ export function ProfileSection({
       {cards.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-white/12 px-4 py-6 text-center text-sm text-white/50">{empty}</p>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-4 gap-y-5">
-          {cards.map((card) => {
+        <VirtualGrid
+          items={cards}
+          actionsHeight={0}
+          getKey={cardKey}
+          renderItem={(card) => {
             const key = cardKey(card);
             return (
-              <div key={key} className="grid gap-2">
+              <>
                 <CardFace card={card} copies={duplicateCount(card, owned)} />
                 {highlight.has(key) ? (
-                  <span className="justify-self-center rounded-full bg-emerald-300/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-200">
+                  <span className="self-center rounded-full bg-emerald-300/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-200">
                     {highlightLabel}
                   </span>
                 ) : null}
-              </div>
+              </>
             );
-          })}
-        </div>
+          }}
+        />
       )}
     </section>
   );
