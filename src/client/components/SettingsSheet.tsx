@@ -167,7 +167,7 @@ export function SettingsSheet({
                   </h4>
                   <p className="text-sm text-white/60">
                     Foil shine and sparkles on cards.{" "}
-                    <span className="text-amber-200">Enabling this may cause the page to lag.</span>
+                    <span className="text-amber-200">Turn off if you experience lag.</span>
                   </p>
                 </div>
                 <Switch
