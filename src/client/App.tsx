@@ -1,11 +1,15 @@
-import { Fragment, useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import {
   ArrowLeftRight,
   Check,
   Eye,
   EyeOff,
+  ExternalLink,
+  Handshake,
   Heart,
+  Info,
   LayoutGrid,
+  Link2,
   LogIn,
   LogOut,
   Plus,
@@ -37,7 +41,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { cardKey, type Card, type Catalog } from "../types.ts";
 import { frameUrl, namePlateStyle } from "./frame.ts";
-import { useGridScrolling, VirtualGrid } from "./VirtualGrid.tsx";
+import { VirtualGrid } from "./VirtualGrid.tsx";
 
 interface SessionProfile {
   id: string;
@@ -60,13 +64,51 @@ interface SessionUser {
 interface Lists {
   forTrade: string[];
   wishlist: string[];
+  accepting?: boolean;
 }
 
-type ListName = keyof Lists;
-type Page = "catalog" | ListName;
+type ListName = "forTrade" | "wishlist";
+type Page = "catalog" | ListName | "trades" | "profile";
+
+interface ListChange {
+  list: ListName;
+  key: string;
+  present: boolean;
+}
+
+const NO_LISTS: Lists = { forTrade: [], wishlist: [] };
+const LIST_SAVE_DELAY = 1200;
+
+function withChanges(base: Lists, changes: ListChange[]): Lists {
+  const next = { ...base };
+  for (const { list, key, present } of changes) {
+    const without = next[list].filter((item) => item !== key);
+    next[list] = present ? [key, ...without] : without;
+  }
+  return next;
+}
+
+interface Trader {
+  id: string;
+  name: string;
+  username: string;
+  avatarUrl: string;
+  kccName: string | null;
+  kccId?: string | null;
+}
+
+interface TradeMatch {
+  trader: Trader;
+  theyHave: string[];
+  theyWant: string[];
+}
+
+interface TradesState {
+  status: "idle" | "loading" | "ready" | "error";
+  matches: TradeMatch[];
+}
 
 interface OwnedCards {
-  characters: string[];
   ss: string[];
   sss: string[];
   hidden: boolean;
@@ -76,7 +118,6 @@ interface OwnedCards {
 
 interface OwnedState {
   status: "idle" | "loading" | "ready" | "hidden" | "unavailable";
-  characters: Set<string>;
   ss: Set<string>;
   sss: Set<string>;
   fetchedAt: string | null;
@@ -102,15 +143,22 @@ interface Filters {
 }
 
 const NO_FILTERS: Filters = { facets: NO_FACETS, owned: "all" };
-const NO_PAGE_FILTERS: Record<Page, Filters> = { catalog: NO_FILTERS, forTrade: NO_FILTERS, wishlist: NO_FILTERS };
+const NO_PAGE_FILTERS: Record<Page, Filters> = {
+  catalog: NO_FILTERS,
+  forTrade: NO_FILTERS,
+  wishlist: NO_FILTERS,
+  trades: NO_FILTERS,
+  profile: NO_FILTERS,
+};
 
 interface Settings {
   hiddenRarities: string[];
   catalogDefaults: Filters;
+  cardEffects: boolean;
 }
 
 const SETTINGS_KEY = "kcc-trader:settings";
-const DEFAULT_SETTINGS: Settings = { hiddenRarities: [], catalogDefaults: NO_FILTERS };
+const DEFAULT_SETTINGS: Settings = { hiddenRarities: [], catalogDefaults: NO_FILTERS, cardEffects: true };
 
 function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
@@ -121,6 +169,7 @@ function loadSettings(): Settings {
     const raw = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? "null") as {
       hiddenRarities?: unknown;
       catalogDefaults?: { facets?: Partial<Record<FacetId, unknown>>; owned?: unknown };
+      cardEffects?: unknown;
     } | null;
     if (!raw) return DEFAULT_SETTINGS;
     const facets = { ...NO_FACETS };
@@ -129,6 +178,7 @@ function loadSettings(): Settings {
     return {
       hiddenRarities: stringList(raw.hiddenRarities),
       catalogDefaults: { facets, owned: owned === "owned" || owned === "missing" ? owned : "all" },
+      cardEffects: raw.cardEffects !== false,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -147,7 +197,6 @@ const OWNED_CHOICES: { value: OwnedFilter; label: string }[] = [
 
 const NO_OWNED: OwnedState = {
   status: "idle",
-  characters: new Set(),
   ss: new Set(),
   sss: new Set(),
   fetchedAt: null,
@@ -164,7 +213,6 @@ class SyncCooldownError extends Error {
 function ownedFromResponse(data: OwnedCards): OwnedState {
   return {
     status: data.hidden ? "hidden" : "ready",
-    characters: new Set(data.characters),
     ss: new Set(data.ss),
     sss: new Set(data.sss),
     fetchedAt: data.fetchedAt,
@@ -194,7 +242,7 @@ function formatTime(value: string): string {
 function isOwned(card: Card, owned: OwnedState): boolean {
   if (card.rank === "SSS") return owned.sss.has(`${card.id}:${card.variantId ?? ""}`);
   if (card.rank === "SS") return owned.ss.has(card.id);
-  return owned.characters.has(card.id);
+  return false;
 }
 
 const RANK_ORDER = ["Common", "B", "A", "S", "SS", "SSS"];
@@ -209,6 +257,7 @@ const PAGES: { id: Page; href: string; label: string; icon: LucideIcon; tone: st
   { id: "catalog", href: "/", label: "Catalog", icon: LayoutGrid, tone: "text-amber-300" },
   { id: "forTrade", href: "/for-trade", label: "For trade", icon: ArrowLeftRight, tone: "text-sky-300" },
   { id: "wishlist", href: "/wishlist", label: "Wishlist", icon: Heart, tone: "text-rose-300" },
+  { id: "trades", href: "/trades", label: "Trades", icon: Handshake, tone: "text-emerald-300" },
 ];
 
 const LIST_COPY: Record<
@@ -238,7 +287,21 @@ const ACTIONS_HEIGHT = 34;
 function pageFromPath(path: string): Page {
   if (path === "/for-trade") return "forTrade";
   if (path === "/wishlist" || path === "/wanted") return "wishlist";
+  if (path === "/trades") return "trades";
+  if (profileIdFromPath(path)) return "profile";
   return "catalog";
+}
+
+function profileIdFromPath(path: string): string | null {
+  return path.match(/^\/u\/(\d{5,25})\/?$/)?.[1] ?? null;
+}
+
+function profileUrl(userId: string): string {
+  return `${window.location.origin}/u/${userId}`;
+}
+
+function kccTradeUrl(trader: Trader): string {
+  return `https://koi-card-collector.com/trade?to=${encodeURIComponent(trader.kccId ?? trader.id)}`;
 }
 
 const FACET_PARAMS: Record<FacetId, string> = { rarity: "rarity", type: "type", game: "game", developer: "dev" };
@@ -387,7 +450,6 @@ function resetFoil(event: ReactPointerEvent<HTMLDivElement>) {
 }
 
 function FoilCard({ card, children }: { card: Card; children: ReactNode }) {
-  const scrolling = useGridScrolling();
   const besties = isBesties(card);
   const border = card.border || "starry";
   const halloween = border.startsWith("halloween-");
@@ -398,41 +460,37 @@ function FoilCard({ card, children }: { card: Card; children: ReactNode }) {
         className="foil-sample"
         data-tier={besties ? "SS" : card.rank}
         data-holo={besties ? "besties" : card.rank === "SSS" ? border : undefined}
-        data-effects={scrolling ? "false" : "true"}
-        data-paused={scrolling ? "true" : undefined}
         data-frame-only={halloween ? "true" : "false"}
         style={{
           ["--foil-strength" as string]: halloween ? 0.36 : 0.8,
           ["--foil-frame" as string]: `url("${frameUrl(card)}")`,
         }}
-        onPointerMove={scrolling ? undefined : tiltFoil}
-        onPointerLeave={scrolling ? undefined : resetFoil}
+        onPointerMove={tiltFoil}
+        onPointerLeave={resetFoil}
       >
         {children}
-        {scrolling ? null : (
-          <div className="foil-treatment" aria-hidden="true">
-            <div className="foil-color" />
-            <div className="foil-grain" />
-            <div className="foil-sweep" />
-            <div className="foil-glare" />
-            {card.rank === "SSS" ? (
-              <div className="foil-stars">
-                {stars.map(([left, top], index) => (
-                  <i
-                    key={`${left}-${top}`}
-                    style={{
-                      left: `${left}%`,
-                      top: `${top}%`,
-                      animationDelay: `-${index * 0.47}s`,
-                      width: index % 3 === 0 ? 16 : 9,
-                      height: index % 3 === 0 ? 16 : 9,
-                    }}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </div>
-        )}
+        <div className="foil-treatment" aria-hidden="true">
+          <div className="foil-color" />
+          <div className="foil-grain" />
+          <div className="foil-sweep" />
+          <div className="foil-glare" />
+          {card.rank === "SSS" ? (
+            <div className="foil-stars">
+              {stars.map(([left, top], index) => (
+                <i
+                  key={`${left}-${top}`}
+                  style={{
+                    left: `${left}%`,
+                    top: `${top}%`,
+                    animationDelay: `-${index * 0.47}s`,
+                    width: index % 3 === 0 ? 16 : 9,
+                    height: index % 3 === 0 ? 16 : 9,
+                  }}
+                />
+              ))}
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -494,16 +552,22 @@ function NavTabs({
   counts,
   onOpen,
   className,
+  stacked = false,
 }: {
   page: Page;
   counts: Record<Page, number | null>;
   onOpen: (page: Page, href: string) => void;
   className?: string;
+  stacked?: boolean;
 }) {
   return (
     <nav
       aria-label="Sections"
-      className={cn("flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1", className)}
+      className={cn(
+        "border border-white/10 bg-white/[0.04] p-1",
+        stacked ? "grid grid-cols-4 gap-1 rounded-2xl" : "flex items-center gap-1 rounded-full",
+        className,
+      )}
     >
       {PAGES.map((item) => {
         const active = page === item.id;
@@ -519,18 +583,33 @@ function NavTabs({
               onOpen(item.id, item.href);
             }}
             className={cn(
-              "flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-2.5 text-sm font-medium whitespace-nowrap transition-colors sm:gap-2 sm:px-3.5 md:flex-none",
+              "flex min-w-0 items-center justify-center font-medium whitespace-nowrap transition-colors",
+              stacked
+                ? "h-[52px] flex-col gap-1 rounded-xl text-[0.7rem]"
+                : "h-9 flex-1 gap-2 rounded-full px-3.5 text-sm lg:flex-none",
               active
                 ? "bg-[#f3d58f] text-[#1b1509] shadow-[0_8px_22px_-10px_rgba(243,213,143,0.8)]"
                 : "text-white/70 hover:bg-white/[0.07] hover:text-white",
             )}
           >
-            <Icon className={cn("size-4", active ? "text-[#1b1509]" : item.tone)} />
-            {item.label}
-            {count !== null ? (
+            <span className="relative shrink-0">
+              <Icon className={cn(stacked ? "size-[18px]" : "size-4", active ? "text-[#1b1509]" : item.tone)} />
+              {stacked && item.id !== "catalog" && count !== null && count > 0 ? (
+                <span
+                  className={cn(
+                    "absolute -top-1.5 left-3 min-w-4 rounded-full px-1 text-center text-[0.6rem] leading-4 font-bold tabular-nums",
+                    active ? "bg-[#1b1509] text-[#f3d58f]" : "bg-white/90 text-[#151223]",
+                  )}
+                >
+                  {count > 99 ? "99+" : count}
+                </span>
+              ) : null}
+            </span>
+            <span className="truncate">{item.label}</span>
+            {count !== null && !stacked ? (
               <span
                 className={cn(
-                  "hidden rounded-full px-1.5 py-0.5 text-[0.7rem] leading-none font-semibold tabular-nums min-[420px]:inline",
+                  "rounded-full px-1.5 py-0.5 text-[0.7rem] leading-none font-semibold tabular-nums",
                   active ? "bg-black/15" : "bg-white/10 text-white/70",
                 )}
               >
@@ -544,7 +623,7 @@ function NavTabs({
   );
 }
 
-function AccountMenu({ user }: { user: SessionUser | null }) {
+function AccountMenu({ user, onOpen }: { user: SessionUser | null; onOpen: (page: Page, href: string) => void }) {
   if (!user) {
     return (
       <Button asChild className="h-9 rounded-full bg-[#5865f2] px-4 text-white hover:bg-[#4752c4]">
@@ -560,16 +639,31 @@ function AccountMenu({ user }: { user: SessionUser | null }) {
   const label = user.globalName ?? user.username;
   return (
     <div className="flex items-center gap-2.5">
-      <div className="hidden text-right leading-tight sm:block">
-        <p className="text-sm font-semibold">{label}</p>
-        <p className="text-xs text-white/55">
-          {user.profile ? `Level ${user.profile.level}` : "No public KCC profile"}
-        </p>
-      </div>
-      <Avatar className="size-9 ring-2 ring-amber-200/50 ring-offset-2 ring-offset-[#151223]">
-        <AvatarImage src={user.avatarUrl} alt="" />
-        <AvatarFallback>{label.slice(0, 1)}</AvatarFallback>
-      </Avatar>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <a
+            href={`/u/${user.id}`}
+            aria-label="Your public lists"
+            onClick={(event) => {
+              event.preventDefault();
+              onOpen("profile", `/u/${user.id}`);
+            }}
+            className="group flex items-center gap-2.5 rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <div className="hidden text-right leading-tight whitespace-nowrap sm:block">
+              <p className="text-sm font-semibold group-hover:text-amber-100">{label}</p>
+              <p className="text-xs text-white/55">
+                {user.profile ? `Level ${user.profile.level}` : "No public KCC profile"}
+              </p>
+            </div>
+            <Avatar className="size-9 ring-2 ring-amber-200/50 ring-offset-2 ring-offset-[#151223] transition group-hover:ring-amber-200">
+              <AvatarImage src={user.avatarUrl} alt="" />
+              <AvatarFallback>{label.slice(0, 1)}</AvatarFallback>
+            </Avatar>
+          </a>
+        </TooltipTrigger>
+        <TooltipContent>Your public lists</TooltipContent>
+      </Tooltip>
       <form method="post" action="/auth/logout">
         <Tooltip>
           <TooltipTrigger asChild>
@@ -764,6 +858,40 @@ function FilterChip({ prefix, label, onRemove }: { prefix?: string; label: strin
   );
 }
 
+function Switch({
+  checked,
+  disabled,
+  onChange,
+  labelledBy,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+  labelledBy: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-labelledby={labelledBy}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-40",
+        checked ? "border-emerald-300/50 bg-emerald-300" : "border-white/15 bg-white/[0.08]",
+      )}
+    >
+      <span
+        className={cn(
+          "size-[18px] rounded-full shadow transition-transform",
+          checked ? "translate-x-[22px] bg-emerald-950" : "translate-x-[3px] bg-white/80",
+        )}
+      />
+    </button>
+  );
+}
+
 function SettingsSheet({
   settings,
   onChange,
@@ -772,6 +900,8 @@ function SettingsSheet({
   options,
   owned,
   ownedAvailable,
+  accepting,
+  onAcceptingChange,
 }: {
   settings: Settings;
   onChange: (settings: Settings) => void;
@@ -780,6 +910,8 @@ function SettingsSheet({
   options: Record<FacetId, string[]>;
   owned: OwnedState;
   ownedAvailable: boolean;
+  accepting: boolean | null;
+  onAcceptingChange: (accepting: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const visibleRarities = rarities.filter((rarity) => !settings.hiddenRarities.includes(rarity));
@@ -828,9 +960,50 @@ function SettingsSheet({
       >
         <SheetHeader className="px-6 pt-6 pb-2">
           <SheetTitle className="font-display text-xl font-bold">Settings</SheetTitle>
-          <SheetDescription>Saved in this browser and applied across the whole app.</SheetDescription>
+          <SheetDescription>Trading is saved to your account. Everything else is saved in this browser.</SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-8 overflow-y-auto px-6 py-4">
+          <section className="flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 id="accepting-label" className="font-display text-base font-bold">
+                  Accepting trades
+                </h3>
+                <p className="text-sm text-white/60">
+                  {accepting === null
+                    ? "Sign in to choose whether other traders can find you."
+                    : accepting
+                      ? "You show up in other traders' matches, and your public page invites offers."
+                      : "You're hidden from other traders' matches, and your public page says you're not trading."}
+                </p>
+              </div>
+              <Switch
+                labelledBy="accepting-label"
+                checked={accepting ?? false}
+                disabled={accepting === null}
+                onChange={onAcceptingChange}
+              />
+            </div>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 id="card-effects-label" className="font-display text-base font-bold">
+                  Card effects
+                </h3>
+                <p className="text-sm text-white/60">
+                  Foil shine and sparkles on cards. Turn off for a calmer, lighter grid.
+                </p>
+              </div>
+              <Switch
+                labelledBy="card-effects-label"
+                checked={settings.cardEffects}
+                onChange={(cardEffects) => onChange({ ...settings, cardEffects })}
+              />
+            </div>
+          </section>
+
           <section className="flex flex-col gap-3">
             <div>
               <h3 className="font-display text-base font-bold">Hidden rarities</h3>
@@ -1214,16 +1387,27 @@ export function App() {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [userLoaded, setUserLoaded] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [lists, setLists] = useState<Lists>({ forTrade: [], wishlist: [] });
+  const [lists, setLists] = useState<Lists>(NO_LISTS);
+  const savedLists = useRef<Lists>(NO_LISTS);
+  const pendingChanges = useRef<ListChange[]>([]);
+  const savingLists = useRef(false);
+  const saveTimer = useRef<number | undefined>(undefined);
+  const [listsSaved, setListsSaved] = useState(0);
   const [listError, setListError] = useState<string | null>(null);
   const [page, setPage] = useState<Page>(INITIAL_PAGE);
+  const [profileId, setProfileId] = useState(() => profileIdFromPath(window.location.pathname));
   const [query, setQuery] = useState(INITIAL_URL_STATE.query);
   const [pageFilters, setPageFilters] = useState<Record<Page, Filters>>(INITIAL_PAGE_FILTERS);
   const [settings, setSettings] = useState<Settings>(INITIAL_SETTINGS);
+  useLayoutEffect(() => {
+    document.documentElement.toggleAttribute("data-no-card-effects", !settings.cardEffects);
+  }, [settings.cardEffects]);
   const [owned, setOwned] = useState<OwnedState>(NO_OWNED);
   const [ownedSyncFailed, setOwnedSyncFailed] = useState(false);
   const [, setSyncTick] = useState(0);
   const [catalogVersion, setCatalogVersion] = useState(0);
+  const [trades, setTrades] = useState<TradesState>({ status: "idle", matches: [] });
+  const [tradesVersion, setTradesVersion] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1267,6 +1451,7 @@ export function App() {
       const next = pageFromPath(window.location.pathname);
       const state = readUrlState(window.location.search);
       setPage(next);
+      setProfileId(profileIdFromPath(window.location.pathname));
       setQuery(state.query);
       setPageFilters((current) => ({ ...current, [next]: state.filters }));
     };
@@ -1285,18 +1470,20 @@ export function App() {
   }, [page, query, currentFilters]);
 
   useEffect(() => {
+    pendingChanges.current = [];
+    savedLists.current = NO_LISTS;
     if (!user) {
-      setLists({ forTrade: [], wishlist: [] });
+      setLists(NO_LISTS);
       return;
     }
     const controller = new AbortController();
     fetch("/api/lists", { signal: controller.signal })
       .then((response) => {
-        if (response.status === 401) return { forTrade: [], wishlist: [] };
+        if (response.status === 401) return NO_LISTS;
         if (!response.ok) throw new Error("Could not load your lists");
         return response.json() as Promise<Lists>;
       })
-      .then(setLists)
+      .then(receiveLists)
       .catch((cause: unknown) => {
         if (cause instanceof DOMException && cause.name === "AbortError") return;
         setListError(cause instanceof Error ? cause.message : "Could not load your lists");
@@ -1309,6 +1496,7 @@ export function App() {
       setOwned(NO_OWNED);
       if (userLoaded) {
         setPageFilters((current) => ({
+          ...current,
           catalog: { ...current.catalog, owned: "all" },
           forTrade: { ...current.forTrade, owned: "all" },
           wishlist: { ...current.wishlist, owned: "all" },
@@ -1333,6 +1521,27 @@ export function App() {
       });
     return () => controller.abort();
   }, [user, userLoaded]);
+
+  useEffect(() => {
+    if (!user) {
+      setTrades({ status: "idle", matches: [] });
+      return;
+    }
+    if (page !== "trades") return;
+    setTrades((current) => ({ ...current, status: "loading" }));
+    const controller = new AbortController();
+    fetch("/api/trades", { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("Could not find trades");
+        return response.json() as Promise<{ matches: TradeMatch[] }>;
+      })
+      .then((data) => setTrades({ status: "ready", matches: data.matches }))
+      .catch((cause: unknown) => {
+        if (cause instanceof DOMException && cause.name === "AbortError") return;
+        setTrades((current) => ({ ...current, status: "error" }));
+      });
+    return () => controller.abort();
+  }, [user, page, listsSaved, tradesVersion]);
 
   async function syncOwned() {
     setOwnedSyncFailed(false);
@@ -1367,32 +1576,101 @@ export function App() {
       window.history.pushState(null, "", `${href}${urlSearchFor("", pageFilters[next])}`);
     }
     setPage(next);
+    setProfileId(profileIdFromPath(href));
     setQuery("");
     setListError(null);
     window.scrollTo({ top: 0 });
   }
 
-  async function toggle(list: ListName, key: string, present: boolean) {
+  function receiveLists(data: Lists) {
+    savedLists.current = data;
+    setLists(withChanges(data, pendingChanges.current));
+  }
+
+  function toggle(list: ListName, key: string, present: boolean) {
     if (!user) {
       setListError("Sign in with Discord to edit your lists.");
       return;
     }
     setListError(null);
-    const response = await fetch("/api/lists", {
+    const change = { list, key, present };
+    pendingChanges.current = [
+      ...pendingChanges.current.filter((item) => item.list !== list || item.key !== key),
+      change,
+    ];
+    setLists((current) => withChanges(current, [change]));
+    scheduleListSave();
+  }
+
+  function scheduleListSave() {
+    window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => void saveLists(false), LIST_SAVE_DELAY);
+  }
+
+  async function saveLists(keepalive: boolean) {
+    if (pendingChanges.current.length === 0) return;
+    if (savingLists.current) {
+      if (!keepalive) scheduleListSave();
+      return;
+    }
+    window.clearTimeout(saveTimer.current);
+    const changes = pendingChanges.current;
+    pendingChanges.current = [];
+    savingLists.current = true;
+    try {
+      const response = await fetch("/api/lists", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ changes }),
+        keepalive,
+      });
+      if (response.status === 401) {
+        setListError("Sign in with Discord to edit your lists.");
+        return;
+      }
+      const data = (await response.json()) as Lists & { error?: string; rejected?: string };
+      if (!response.ok) {
+        setListError(data.error ?? "Couldn't save your list changes.");
+        return;
+      }
+      if (data.rejected) setListError(data.rejected);
+      savedLists.current = data;
+      setListsSaved((version) => version + 1);
+    } catch {
+      setListError("Couldn't save your list changes. Check your connection and try again.");
+    } finally {
+      savingLists.current = false;
+      setLists(withChanges(savedLists.current, pendingChanges.current));
+    }
+  }
+
+  useEffect(() => {
+    const flush = () => void saveLists(true);
+    const flushWhenHidden = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", flushWhenHidden);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", flushWhenHidden);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, []);
+
+  async function setAccepting(accepting: boolean) {
+    const previous = lists.accepting;
+    setLists((current) => ({ ...current, accepting }));
+    const response = await fetch("/api/preferences", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ list, key, present }),
-    });
-    if (response.status === 401) {
-      setListError("Sign in with Discord to edit your lists.");
+      body: JSON.stringify({ accepting }),
+    }).catch(() => null);
+    if (!response?.ok) {
+      setLists((current) => ({ ...current, accepting: previous }));
+      setListError("Couldn't save your trading preference. Try again in a moment.");
       return;
     }
-    const data = (await response.json()) as Lists & { error?: string };
-    if (!response.ok) {
-      setListError(data.error ?? "Could not update that list");
-      return;
-    }
-    setLists(data);
+    receiveLists((await response.json()) as Lists);
   }
 
   function clearFilters() {
@@ -1408,10 +1686,12 @@ export function App() {
     const cleaned: Settings = {
       hiddenRarities: next.hiddenRarities,
       catalogDefaults: withoutRarities(next.catalogDefaults, next.hiddenRarities),
+      cardEffects: next.cardEffects,
     };
     setSettings(cleaned);
     window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(cleaned));
     setPageFilters((current) => ({
+      ...current,
       catalog:
         cleaned.catalogDefaults !== settings.catalogDefaults
           ? cleaned.catalogDefaults
@@ -1425,13 +1705,19 @@ export function App() {
     () => orderedValues((catalog?.cards ?? []).map((card) => card.rank), RANK_ORDER),
     [catalog],
   );
+  const sortedCatalog = useMemo(
+    () =>
+      [...(catalog?.cards ?? [])].sort(
+        (a, b) => RANK_ORDER.indexOf(b.rank) - RANK_ORDER.indexOf(a.rank) || a.name.localeCompare(b.name),
+      ),
+    [catalog],
+  );
   const cards = useMemo(() => {
-    const all = catalog?.cards ?? [];
     const hidden = settings.hiddenRarities;
-    return hidden.length > 0 ? all.filter((card) => !hidden.includes(card.rank)) : all;
-  }, [catalog, settings.hiddenRarities]);
+    return hidden.length > 0 ? sortedCatalog.filter((card) => !hidden.includes(card.rank)) : sortedCatalog;
+  }, [sortedCatalog, settings.hiddenRarities]);
   const byKey = useMemo(() => new Map(cards.map((card) => [cardKey(card), card])), [cards]);
-  const listName: ListName | null = page === "catalog" ? null : page;
+  const listName: ListName | null = page === "forTrade" || page === "wishlist" ? page : null;
   const selectedKeys = listName ? lists[listName] : [];
   const selected = selectedKeys.flatMap((key) => {
     const card = byKey.get(key);
@@ -1441,10 +1727,14 @@ export function App() {
   const catalogOptions = useMemo(() => facetOptionsFor(cards), [cards]);
   const sssCount = useMemo(() => cards.filter((card) => card.rank === "SSS").length, [cards]);
   const showcase = useMemo(() => {
-    const pool = cards.filter((card) => card.rank === "SSS" && card.image && (card.border ?? "starry") === "starry");
+    const pool = (catalog?.cards ?? []).filter((card) => card.rank === "SSS" && card.image);
     if (pool.length < 3) return [];
-    return [pool[Math.floor(pool.length * 0.21)], pool[Math.floor(pool.length * 0.47)], pool[Math.floor(pool.length * 0.78)]];
-  }, [cards]);
+    for (let index = pool.length - 1; index > pool.length - 4; index--) {
+      const pick = Math.floor(Math.random() * (index + 1));
+      [pool[index], pool[pick]] = [pool[pick], pool[index]];
+    }
+    return pool.slice(-3);
+  }, [catalog]);
   const filters = pageFilters[page];
   const catalogView = listName ? null : applyFilters(cards, filters, owned, needle);
   const catalogCards = catalogView?.cards ?? [];
@@ -1469,7 +1759,7 @@ export function App() {
           .filter((card) => searchableText(card).includes(needle) && (!searchOwnedOnly || isOwned(card, owned)))
           .slice(0, 24)
       : [];
-  const searchHint = listName === "forTrade" ? (tradeUnavailableReason ?? "Only cards in your KCC collection show up here.") : null;
+  const searchHint = listName === "forTrade" ? tradeUnavailableReason : null;
   const tradeKeys = new Set(lists.forTrade);
   const wishKeys = new Set(lists.wishlist);
   const ownedProblem = ownedSyncFailed
@@ -1503,15 +1793,27 @@ export function App() {
     catalog: catalog ? cards.length : null,
     forTrade: user && catalog ? lists.forTrade.filter((key) => byKey.has(key)).length : null,
     wishlist: user && catalog ? lists.wishlist.filter((key) => byKey.has(key)).length : null,
+    trades: null,
+    profile: null,
   };
+  const tradeMatches = useMemo(
+    () =>
+      trades.matches.flatMap((match) => {
+        const theyHave = match.theyHave.flatMap((key) => byKey.get(key) ?? []);
+        const theyWant = match.theyWant.flatMap((key) => byKey.get(key) ?? []);
+        return theyHave.length > 0 && theyWant.length > 0 ? [{ trader: match.trader, theyHave, theyWant }] : [];
+      }),
+    [trades.matches, byKey],
+  );
+  if (trades.status === "ready" && catalog) counts.trades = tradeMatches.length;
 
   return (
     <div className="flex min-h-svh flex-col">
       <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#151223]/95">
         <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-4 md:px-8">
           <Brand onOpen={openPage} />
-          <NavTabs page={page} counts={counts} onOpen={openPage} className="mx-auto hidden md:flex" />
-          <div className="ml-auto flex items-center gap-1 md:ml-0">
+          <NavTabs page={page} counts={counts} onOpen={openPage} className="mx-auto hidden lg:flex" />
+          <div className="ml-auto flex items-center gap-1 lg:ml-0">
             <SettingsSheet
               settings={settings}
               onChange={updateSettings}
@@ -1520,21 +1822,59 @@ export function App() {
               options={catalogOptions}
               owned={owned}
               ownedAvailable={Boolean(user?.profile)}
+              accepting={user ? lists.accepting !== false : null}
+              onAcceptingChange={setAccepting}
             />
-            {userLoaded ? <AccountMenu user={user} /> : null}
+            {userLoaded ? <AccountMenu user={user} onOpen={openPage} /> : null}
           </div>
         </div>
-        <div className="px-4 pb-3 md:hidden">
+        <div className="hidden px-4 pb-3 sm:block lg:hidden">
           <NavTabs page={page} counts={counts} onOpen={openPage} />
         </div>
       </header>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.08] bg-[#151223]/95 px-2 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] sm:hidden">
+        <NavTabs
+          page={page}
+          counts={counts}
+          onOpen={openPage}
+          stacked
+          className="rounded-none border-0 bg-transparent p-0"
+        />
+      </div>
 
       <main className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 px-4 py-6 md:px-8 md:py-10">
         {authError ? <Banner>{authError}</Banner> : null}
         {error ? <Banner>{error}</Banner> : null}
         {listError ? <Banner>{listError}</Banner> : null}
 
-        {listName ? (
+        {page === "profile" && profileId ? (
+          <ProfilePage
+            key={profileId}
+            profileId={profileId}
+            user={user}
+            byKey={byKey}
+            catalogLoaded={catalog !== null}
+            myWishlist={wishKeys}
+            myForTrade={tradeKeys}
+            filters={pageFilters.profile}
+            onFiltersChange={(next) => setFiltersFor("profile", next)}
+            owned={owned}
+            ownedControls={ownedControls}
+            myAccepting={lists.accepting !== false}
+          />
+        ) : page === "trades" ? (
+          <TradesPage
+            user={user}
+            loading={trades.status === "loading" || trades.status === "idle" || !catalog}
+            failed={trades.status === "error"}
+            matches={tradeMatches}
+            needsBothLists={lists.forTrade.length === 0 || lists.wishlist.length === 0}
+            onRetry={() => setTradesVersion((version) => version + 1)}
+            onOpen={openPage}
+            accepting={lists.accepting !== false}
+          />
+        ) : listName ? (
           <ListPage
             list={listName}
             user={user}
@@ -1650,11 +1990,456 @@ export function App() {
         )}
       </main>
 
-      <footer className="mx-auto w-full max-w-[1400px] px-4 pb-10 text-xs text-white/40 md:px-8">
+      <footer className="mx-auto w-full max-w-[1400px] px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] text-xs text-white/40 sm:pb-10 md:px-8">
         Card data and art from Koi Card Collector
         {catalog?.syncedAt ? ` · synced ${formatSyncedAt(catalog.syncedAt)}` : ""}
       </footer>
     </div>
+  );
+}
+
+function copyWithSelection(text: string): boolean {
+  const field = document.createElement("textarea");
+  field.value = text;
+  field.setAttribute("readonly", "");
+  field.style.position = "fixed";
+  field.style.opacity = "0";
+  document.body.append(field);
+  field.select();
+  try {
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  } finally {
+    field.remove();
+  }
+}
+
+function ShareListsButton({ userId, className }: { userId: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function share() {
+    const url = profileUrl(userId);
+    const ok = await navigator.clipboard.writeText(url).then(
+      () => true,
+      () => copyWithSelection(url),
+    );
+    if (!ok) {
+      window.prompt("Copy this link to share your lists:", url);
+      return;
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="outline" size="sm" className={cn("rounded-full", className)} onClick={share}>
+          {copied ? <Check /> : <Link2 />}
+          {copied ? "Link copied" : "Share lists"}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Copy a link to a public page with your For trade and Wishlist</TooltipContent>
+    </Tooltip>
+  );
+}
+
+interface PublicLists extends Lists {
+  trader: Trader;
+}
+
+function ProfileSection({
+  title,
+  icon: Icon,
+  tone,
+  cards,
+  highlight,
+  highlightLabel,
+  empty,
+}: {
+  title: string;
+  icon: LucideIcon;
+  tone: string;
+  cards: Card[];
+  highlight: Set<string>;
+  highlightLabel: string;
+  empty: string;
+}) {
+  return (
+    <section className="grid gap-4">
+      <SectionHeading
+        title={title}
+        meta={
+          <span className="inline-flex items-center gap-1.5">
+            <Icon className={cn("size-4", tone)} />
+            {cards.length.toLocaleString()} {cards.length === 1 ? "card" : "cards"}
+          </span>
+        }
+      />
+      {cards.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-white/12 px-4 py-6 text-center text-sm text-white/50">{empty}</p>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-4 gap-y-5">
+          {cards.map((card) => {
+            const key = cardKey(card);
+            return (
+              <div key={key} className="grid gap-2">
+                <CardFace card={card} />
+                {highlight.has(key) ? (
+                  <span className="justify-self-center rounded-full bg-emerald-300/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-200">
+                    {highlightLabel}
+                  </span>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ProfilePage({
+  profileId,
+  user,
+  byKey,
+  catalogLoaded,
+  myWishlist,
+  myForTrade,
+  filters,
+  onFiltersChange,
+  owned,
+  ownedControls,
+  myAccepting,
+}: {
+  myAccepting: boolean;
+  profileId: string;
+  user: SessionUser | null;
+  byKey: Map<string, Card>;
+  catalogLoaded: boolean;
+  myWishlist: Set<string>;
+  myForTrade: Set<string>;
+  filters: Filters;
+  onFiltersChange: (filters: Filters) => void;
+  owned: OwnedState;
+  ownedControls: OwnedControls | null;
+}) {
+  const [state, setState] = useState<{ status: "loading" | "ready" | "missing" | "error"; lists: PublicLists | null }>({
+    status: "loading",
+    lists: null,
+  });
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/traders/${profileId}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (response.status === 404) return setState({ status: "missing", lists: null });
+        if (!response.ok) throw new Error("Could not load lists");
+        setState({ status: "ready", lists: (await response.json()) as PublicLists });
+      })
+      .catch((cause: unknown) => {
+        if (cause instanceof DOMException && cause.name === "AbortError") return;
+        setState({ status: "error", lists: null });
+      });
+    return () => controller.abort();
+  }, [profileId]);
+
+  if (state.status === "missing" || state.status === "error") {
+    return (
+      <EmptyState icon={SearchX} title={state.status === "missing" ? "No lists here" : "Couldn't load these lists"}>
+        {state.status === "missing"
+          ? "This trader hasn't shared any lists on KCC Trader yet."
+          : "Something went wrong. Try again in a moment."}
+      </EmptyState>
+    );
+  }
+
+  if (!state.lists || !catalogLoaded) {
+    return (
+      <>
+        <Skeleton className="h-[92px] rounded-[1.75rem] bg-white/[0.05]" />
+        <GridSkeleton />
+      </>
+    );
+  }
+
+  const { trader } = state.lists;
+  const own = user?.id === trader.id;
+  const accepting = own ? myAccepting : state.lists.accepting !== false;
+  const forTrade = state.lists.forTrade.flatMap((key) => byKey.get(key) ?? []);
+  const wishlist = state.lists.wishlist.flatMap((key) => byKey.get(key) ?? []);
+  const combined = [...new Set([...forTrade, ...wishlist])];
+  const view = applyFilters(combined, filters, owned, "");
+  const passing = new Set(view.cards);
+  const filtering = filtersAreActive(filters, owned);
+
+  return (
+    <>
+      <section className="flex flex-wrap items-center gap-4 rounded-[1.75rem] border border-white/10 bg-[radial-gradient(110%_130%_at_0%_0%,rgba(243,213,143,0.16),transparent_55%),linear-gradient(160deg,#221a37,#141224)] px-5 py-4 md:px-8 md:py-5">
+        <Avatar className="size-14 ring-2 ring-amber-200/40 ring-offset-2 ring-offset-[#1c1730]">
+          <AvatarImage src={trader.avatarUrl} alt="" />
+          <AvatarFallback>{trader.name.slice(0, 1)}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1 font-display text-2xl leading-tight font-extrabold tracking-tight md:text-3xl">
+            <span className="truncate">{trader.name}</span>
+            {accepting ? null : (
+              <span className="rounded-full bg-white/[0.08] px-2.5 py-0.5 font-sans text-xs font-semibold tracking-normal text-white/70">
+                Not accepting trades
+              </span>
+            )}
+          </h1>
+          <p className="truncate text-sm text-white/60">
+            @{trader.username}
+            {trader.kccName ? ` · ${trader.kccName} on KCC` : ""}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {own ? (
+            <ShareListsButton userId={trader.id} />
+          ) : !accepting ? null : (
+            <Button asChild size="sm" className="rounded-full bg-emerald-300 text-emerald-950 hover:bg-emerald-200">
+              <a href={kccTradeUrl(trader)} target="_blank" rel="noreferrer">
+                <ArrowLeftRight />
+                Offer a trade on KCC
+                <ExternalLink />
+              </a>
+            </Button>
+          )}
+        </div>
+      </section>
+
+      {combined.length > 0 ? (
+        <FilterBar
+          options={facetOptionsFor(combined)}
+          counts={view.counts}
+          filters={filters}
+          onChange={onFiltersChange}
+          ownedControls={ownedControls}
+          shown={view.cards.length}
+          total={combined.length}
+          noun={combined.length === 1 ? "card" : "cards"}
+        />
+      ) : null}
+      <ProfileSection
+        title="For trade"
+        icon={ArrowLeftRight}
+        tone="text-sky-300"
+        cards={forTrade.filter((card) => passing.has(card))}
+        highlight={own ? new Set() : myWishlist}
+        highlightLabel="On your wishlist"
+        empty={filtering && forTrade.length > 0 ? "No cards for trade match your filters." : "Nothing listed for trade."}
+      />
+      <ProfileSection
+        title="Wishlist"
+        icon={Heart}
+        tone="text-rose-300"
+        cards={wishlist.filter((card) => passing.has(card))}
+        highlight={own ? new Set() : myForTrade}
+        highlightLabel="You have this for trade"
+        empty={filtering && wishlist.length > 0 ? "No wishlist cards match your filters." : "Nothing on the wishlist."}
+      />
+    </>
+  );
+}
+
+interface ResolvedMatch {
+  trader: Trader;
+  theyHave: Card[];
+  theyWant: Card[];
+}
+
+const MATCH_PREVIEW = 8;
+
+function MatchCards({ title, cards, tone }: { title: string; cards: Card[]; tone: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? cards : cards.slice(0, MATCH_PREVIEW);
+  return (
+    <div className="grid content-start gap-3 rounded-[14px] border border-white/[0.06] bg-white/[0.03] p-4">
+      <p className="flex items-center justify-between gap-2 text-sm font-semibold">
+        <span className="flex items-center gap-2">
+          <span className={cn("size-2 rounded-full", tone)} />
+          {title}
+        </span>
+        <span className="rounded-full bg-white/[0.08] px-2 py-0.5 text-xs text-white/70 tabular-nums">{cards.length}</span>
+      </p>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2">
+        {shown.map((card) => (
+          <CardFace key={cardKey(card)} card={card} />
+        ))}
+      </div>
+      {cards.length > MATCH_PREVIEW ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="justify-self-start rounded-full text-white/70"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? "Show less" : `Show all ${cards.length}`}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function TraderMatch({ match, onOpen }: { match: ResolvedMatch; onOpen: (page: Page, href: string) => void }) {
+  const { trader, theyHave, theyWant } = match;
+  const tradeUrl = kccTradeUrl(trader);
+
+  return (
+    <article className="grid gap-4 rounded-3xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
+      <header className="flex flex-wrap items-center gap-3">
+        <Avatar className="size-11">
+          <AvatarImage src={trader.avatarUrl} alt="" />
+          <AvatarFallback>{trader.name.slice(0, 1)}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <a
+            href={`/u/${trader.id}`}
+            onClick={(event) => {
+              event.preventDefault();
+              onOpen("profile", `/u/${trader.id}`);
+            }}
+            className="block truncate font-display text-lg leading-tight font-bold hover:text-amber-100 hover:underline"
+          >
+            {trader.name}
+          </a>
+          <p className="truncate text-sm text-white/55">
+            @{trader.username}
+            {trader.kccName ? ` · ${trader.kccName} on KCC` : ""}
+          </p>
+        </div>
+        <Button asChild size="sm" className="rounded-full bg-emerald-300 text-emerald-950 hover:bg-emerald-200">
+          <a href={tradeUrl} target="_blank" rel="noreferrer">
+            <ArrowLeftRight />
+            Offer a trade on KCC
+            <ExternalLink />
+          </a>
+        </Button>
+      </header>
+      <div className="grid gap-3 md:grid-cols-2">
+        <MatchCards
+          title="They have, you want"
+          cards={theyHave}
+          tone="bg-rose-300"
+        />
+        <MatchCards title="You have, they want" cards={theyWant} tone="bg-sky-300" />
+      </div>
+    </article>
+  );
+}
+
+function TradesPage({
+  user,
+  loading,
+  failed,
+  matches,
+  needsBothLists,
+  onRetry,
+  onOpen,
+  accepting,
+}: {
+  accepting: boolean;
+  user: SessionUser | null;
+  loading: boolean;
+  failed: boolean;
+  matches: ResolvedMatch[];
+  needsBothLists: boolean;
+  onRetry: () => void;
+  onOpen: (page: Page, href: string) => void;
+}) {
+  return (
+    <>
+      <section className="flex items-center gap-4 rounded-[1.75rem] border border-white/10 bg-[radial-gradient(110%_130%_at_0%_0%,rgba(110,231,183,0.18),transparent_55%),linear-gradient(160deg,#18242a,#141224)] px-5 py-4 md:px-8 md:py-5">
+        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-emerald-300/15 text-emerald-300">
+          <Handshake className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h1 className="font-display text-2xl leading-tight font-extrabold tracking-tight md:text-3xl">Trades</h1>
+          <p className="text-sm text-white/65">Traders who have cards you want and want cards you have.</p>
+        </div>
+        {user && !loading && !failed ? (
+          <div className="shrink-0 text-right">
+            <p className="font-display text-3xl leading-none font-extrabold tabular-nums">{matches.length}</p>
+            <p className="mt-1 text-xs text-white/60">{matches.length === 1 ? "trader" : "traders"}</p>
+          </div>
+        ) : null}
+      </section>
+
+      {user && !accepting ? (
+        <p className="rounded-2xl border border-amber-200/25 bg-amber-200/[0.07] px-4 py-3 text-sm text-amber-100/90">
+          You're not accepting trades, so other traders can't see you in their matches. Turn on Accepting trades in
+          Settings to show up again.
+        </p>
+      ) : null}
+
+      {!user ? (
+        <EmptyState
+          icon={LogIn}
+          title="Sign in to find trades"
+          action={
+            <Button asChild className="mt-1 rounded-full bg-[#5865f2] text-white hover:bg-[#4752c4]">
+              <a href="/auth/discord">
+                <LogIn />
+                Sign in with Discord
+              </a>
+            </Button>
+          }
+        >
+          We match your lists against every other trader's, so you need to be signed in.
+        </EmptyState>
+      ) : needsBothLists ? (
+        <EmptyState
+          icon={Handshake}
+          title="Fill in both lists"
+          action={
+            <div className="mt-1 flex flex-wrap justify-center gap-2">
+              <Button variant="outline" className="rounded-full" onClick={() => onOpen("wishlist", "/wishlist")}>
+                <Heart />
+                Build your wishlist
+              </Button>
+              <Button variant="outline" className="rounded-full" onClick={() => onOpen("forTrade", "/for-trade")}>
+                <ArrowLeftRight />
+                Pick cards to trade
+              </Button>
+            </div>
+          }
+        >
+          Trades go both ways, so add cards you want to your Wishlist and cards you can give away to For trade.
+        </EmptyState>
+      ) : failed ? (
+        <EmptyState
+          icon={SearchX}
+          title="Couldn't find trades"
+          action={
+            <Button variant="outline" className="mt-1 rounded-full" onClick={onRetry}>
+              <RotateCcw />
+              Try again
+            </Button>
+          }
+        >
+          Something went wrong while comparing lists.
+        </EmptyState>
+      ) : loading ? (
+        <div className="grid gap-4">
+          {Array.from({ length: 2 }, (_, index) => (
+            <Skeleton key={index} className="h-64 rounded-3xl bg-white/[0.05]" />
+          ))}
+        </div>
+      ) : matches.length === 0 ? (
+        <EmptyState icon={Handshake} title="No matches yet">
+          Nobody has a card you want while also wanting one of yours. Adding more cards to your Wishlist and For trade list
+          makes a match more likely.
+        </EmptyState>
+      ) : (
+        <div className="grid gap-4">
+          {matches.map((match) => (
+            <TraderMatch key={match.trader.id} match={match} onOpen={onOpen} />
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1713,10 +2498,13 @@ function ListPage({
           <p className="text-sm text-white/65">{copy.blurb}</p>
         </div>
         {user ? (
-          <div className="shrink-0 text-right">
-            <p className="font-display text-3xl leading-none font-extrabold tabular-nums">{selected.length}</p>
-            <p className="mt-1 text-xs text-white/60">{selected.length === 1 ? "card" : "cards"}</p>
-          </div>
+          <>
+            <ShareListsButton userId={user.id} className="hidden sm:inline-flex" />
+            <div className="shrink-0 text-right">
+              <p className="font-display text-3xl leading-none font-extrabold tabular-nums">{selected.length}</p>
+              <p className="mt-1 text-xs text-white/60">{selected.length === 1 ? "card" : "cards"}</p>
+            </div>
+          </>
         ) : null}
       </section>
 
@@ -1738,13 +2526,32 @@ function ListPage({
       ) : (
         <>
           <section className="grid gap-4 rounded-3xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
-            <SearchField
-              id="list-search"
-              label="Find cards to add"
-              value={query}
-              placeholder="Find cards to add by name, game, or developer"
-              onChange={onQuery}
-            />
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <SearchField
+                  id="list-search"
+                  label="Find cards to add"
+                  value={query}
+                  placeholder="Find cards to add by name, game, or developer"
+                  onChange={onQuery}
+                />
+              </div>
+              {searchOwnedOnly && !searchHint ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 rounded-full text-white/55"
+                      aria-label="Only cards in your KCC collection show up here."
+                    >
+                      <Info />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Only cards in your KCC collection show up here.</TooltipContent>
+                </Tooltip>
+              ) : null}
+            </div>
             {searchHint ? <p className="-mt-2 px-1 text-xs text-white/50">{searchHint}</p> : null}
             {searching && matches.length > 0 ? (
                 <VirtualGrid

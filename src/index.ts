@@ -1,11 +1,31 @@
-import { beginDiscordLogin, finishDiscordLogin, logout, readSession, type AuthEnv } from "./auth.ts";
-import { serveArt } from "./art.ts";
-import { changeList, readLists, type ListName } from "./lists.ts";
+import { beginDiscordLogin, finishDiscordLogin, logout, readSession, type AuthEnv, type SessionUser } from "./auth.ts";
+import {
+  changeLists,
+  parseChanges,
+  readLists,
+  readPublicLists,
+  setAccepting,
+  type ListChange,
+  type Trader,
+} from "./lists.ts";
 import { ownsCard, readOwned, SyncCooldownError } from "./owned.ts";
 import { discoverHiddenCards, readCatalog, syncCatalog } from "./sync.ts";
+import { findTrades } from "./trades.ts";
+
+function traderFor(user: SessionUser): Trader {
+  return {
+    id: user.id,
+    name: user.globalName ?? user.username,
+    username: user.username,
+    avatarUrl: user.avatarUrl,
+    kccName: user.profile?.name ?? null,
+    kccId: user.profile?.id ?? null,
+  };
+}
 
 interface Env extends AuthEnv {
   CARDS: KVNamespace;
+  DB: D1Database;
   SYNC_TOKEN?: string;
 }
 
@@ -34,7 +54,7 @@ export default {
       if (!user.profile) return Response.json({ error: "No public KCC profile" }, { status: 404 });
       try {
         const owned = await readOwned(env, user.profile.id, request.method === "POST");
-        const characterIds = [...owned.characters, ...owned.ss, ...owned.sss.map((key) => key.split(":")[0])];
+        const characterIds = [...owned.ss, ...owned.sss.map((key) => key.split(":")[0])];
         const catalogChanged = await discoverHiddenCards(env, characterIds).catch(() => false);
         return Response.json({ ...owned, catalogChanged });
       } catch (error) {
@@ -46,39 +66,59 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/trades" && request.method === "GET") {
+      const user = await readSession(request, env);
+      if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
+      return Response.json({ matches: await findTrades(env, user.id) });
+    }
+
+    const traderPath = url.pathname.match(/^\/api\/traders\/(\d{5,25})$/);
+    if (traderPath && request.method === "GET") {
+      const lists = await readPublicLists(env, traderPath[1]);
+      if (!lists) return Response.json({ error: "No lists for that trader" }, { status: 404 });
+      return Response.json(lists);
+    }
+
+    if (url.pathname === "/api/preferences" && request.method === "POST") {
+      const user = await readSession(request, env);
+      if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
+      const body = (await request.json().catch(() => null)) as { accepting?: unknown } | null;
+      if (typeof body?.accepting !== "boolean") {
+        return Response.json({ error: "Invalid preferences" }, { status: 400 });
+      }
+      return Response.json(await setAccepting(env, traderFor(user), body.accepting));
+    }
+
     if (url.pathname === "/api/lists") {
       const user = await readSession(request, env);
       if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
       if (request.method === "GET") {
-        return Response.json(await readLists(env, user.id));
+        return Response.json(await readLists(env, traderFor(user)));
       }
       if (request.method === "POST") {
-        const body = (await request.json().catch(() => null)) as {
-          list?: ListName;
-          key?: string;
-          present?: boolean;
-        } | null;
-        if (!body || (body.list !== "forTrade" && body.list !== "wishlist") || typeof body.key !== "string") {
-          return Response.json({ error: "Invalid list update" }, { status: 400 });
+        const body = (await request.json().catch(() => null)) as { changes?: unknown } | null;
+        const changes = parseChanges(body?.changes);
+        if (!changes) return Response.json({ error: "Invalid list update" }, { status: 400 });
+
+        let rejected: string | null = null;
+        const accepted: ListChange[] = [];
+        const needsOwned = changes.some((change) => change.list === "forTrade" && change.present);
+        const owned = needsOwned && user.profile ? await readOwned(env, user.profile.id, false).catch(() => null) : null;
+        for (const change of changes) {
+          if (change.list !== "forTrade" || !change.present) accepted.push(change);
+          else if (!user.profile) rejected = "Link a public KCC profile to list cards for trade.";
+          else if (!owned || owned.hidden) {
+            rejected = "We couldn't read your KCC collection, so we can't check that you own these cards.";
+          } else if (!ownsCard(owned, change.key)) rejected = "You can only list cards you own for trade.";
+          else accepted.push(change);
         }
-        if (body.list === "forTrade" && body.present) {
-          if (!user.profile) {
-            return Response.json({ error: "Link a public KCC profile to list cards for trade." }, { status: 403 });
-          }
-          const owned = await readOwned(env, user.profile.id, false).catch(() => null);
-          if (!owned || owned.hidden) {
-            return Response.json({ error: "We couldn't read your KCC collection, so we can't check that you own this card." }, { status: 403 });
-          }
-          if (!ownsCard(owned, body.key)) {
-            return Response.json({ error: "You can only list cards you own for trade." }, { status: 403 });
-          }
+
+        if (accepted.length === 0) {
+          return Response.json({ ...(await readLists(env, traderFor(user))), rejected });
         }
-        try {
-          return Response.json(await changeList(env, user.id, body.list, body.key, Boolean(body.present)));
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "Could not update list";
-          return Response.json({ error: message }, { status: 400 });
-        }
+        const { full, ...lists } = await changeLists(env, traderFor(user), accepted);
+        if (full) rejected = "That list is full.";
+        return Response.json(rejected ? { ...lists, rejected } : lists);
       }
     }
 
@@ -92,10 +132,6 @@ export default {
 
     if (url.pathname === "/auth/logout" && request.method === "POST") {
       return logout(request);
-    }
-
-    if (url.pathname.startsWith("/media/art/") && request.method === "GET") {
-      return serveArt(env, url.pathname.slice("/media/art/".length));
     }
 
     if (url.pathname === "/sync" && request.method === "POST") {

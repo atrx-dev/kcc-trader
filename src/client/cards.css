@@ -27,24 +27,25 @@
 }
 
 .virtual-grid[data-scrolling] .foil-sample {
-  transition: none;
+  transition: box-shadow 0.15s;
   transform: none;
   box-shadow: none;
 }
 
 .virtual-grid[data-scrolling] .foil {
+  transition: box-shadow 0.15s;
   box-shadow: none;
 }
 
-.virtual-grid[data-scrolling] .foil-treatment,
-.foil-sample[data-effects="false"] .foil-treatment {
-  display: none;
+.virtual-grid[data-scrolling] .foil-treatment {
+  opacity: 0;
+  transition: opacity 0.15s;
 }
 
-.foil-sample[data-paused="true"],
-.foil-sample[data-effects="false"] {
-  transition: none;
-  transform: none;
+.virtual-grid[data-scrolling] .foil-treatment *,
+.virtual-grid[data-scrolling] .foil-treatment::before,
+.virtual-grid[data-scrolling] .foil-treatment::after {
+  animation-play-state: paused;
 }
 
 .entry {
@@ -175,6 +176,7 @@
 
 .foil {
   box-shadow: 0 0 24px #c5f27718;
+  transition: box-shadow 0.45s ease-out;
 }
 
 .foil-stage {
@@ -188,7 +190,7 @@
   position: relative;
   border-radius: 5px;
   transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
-  transition: transform 0.18s ease-out, box-shadow 0.3s;
+  transition: transform 0.18s ease-out, box-shadow 0.45s ease-out;
   box-shadow: 0 15px 35px #0007;
 }
 
@@ -204,6 +206,7 @@
   pointer-events: none;
   z-index: 3;
   opacity: var(--foil-strength, 0.55);
+  transition: opacity 0.45s ease-out;
   border-radius: 5px;
   position: absolute;
   inset: 0;
@@ -519,6 +522,10 @@
   0%,
   100% { opacity: 0.12; transform: scale(0.55); }
   50% { opacity: 1; transform: scale(1); }
+}
+
+[data-no-card-effects] .foil-treatment {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -20,6 +20,6 @@ export interface Catalog {
   cards: Card[];
 }
 
-export function cardKey(card: Pick<Card, "category" | "id" | "variantId" | "rank">): string {
-  return `${card.category}:${card.id}:${card.variantId ?? ""}:${card.rank}`;
+export function cardKey(card: Pick<Card, "id" | "variantId" | "rank">): string {
+  return `${card.id}:${card.variantId ?? ""}:${card.rank}`;
 }

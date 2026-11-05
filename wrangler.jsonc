@@ -15,6 +15,15 @@
       "id": "placeholder"
     }
   ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "kcc-trader",
+      // Replace with the id from `npx wrangler d1 create kcc-trader` before deploying.
+      "database_id": "placeholder",
+      "migrations_dir": "migrations"
+    }
+  ],
   "triggers": {
     "crons": ["0 4 * * *"]
   }

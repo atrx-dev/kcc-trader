@@ -1,4 +1,3 @@
-import { cacheArt } from "./art.ts";
 import type { Card, CardCategory, Catalog } from "./types.ts";
 
 const ORIGIN = "https://koi-card-collector.com";
@@ -50,10 +49,10 @@ interface DexPage {
   total?: number;
 }
 
-export function localArtPath(path: string | undefined): string {
+export function artUrl(path: string | undefined): string {
   if (!path) return "";
   const match = path.match(/\/art\/([0-9a-f-]{36})/i);
-  return match ? `/media/art/${match[1]}` : "";
+  return match ? `${ORIGIN}/api/community/art/${match[1]}?w=300` : "";
 }
 
 function artwork(card: DexCard): ArtRef | undefined {
@@ -76,7 +75,7 @@ function slim(card: DexCard, category: CardCategory): Card {
     variantId: card.variant?.id ?? null,
     variantName: card.variant?.name ?? null,
     border: rank === "SSS" ? (art?.border ?? card.character.sss?.border ?? "starry") : null,
-    image: localArtPath(art?.crop),
+    image: artUrl(art?.crop),
   };
 }
 
@@ -156,7 +155,7 @@ function sssCardsFor(character: DexCharacter): Card[] {
     variantId: variant.id,
     variantName: variant.name ?? null,
     border: variant.art?.border || "starry",
-    image: localArtPath(variant.art?.crop),
+    image: artUrl(variant.art?.crop),
   }));
 }
 
@@ -181,20 +180,13 @@ function rankCardFor(character: DexCharacter, rank: "SS"): Card {
     variantId: null,
     variantName: null,
     border: null,
-    image: localArtPath(art?.crop),
+    image: artUrl(art?.crop),
   };
 }
 
 function hiddenCardsFor(character: DexCharacter): Card[] {
   const base = character.isPromo ? [] : [rankCardFor(character, "SS")];
   return [...base, ...sssCardsFor(character)].map((card) => ({ ...card, hidden: true }));
-}
-
-function artIdsOf(cards: Card[]): string[] {
-  return cards.flatMap((card) => {
-    const match = card.image.match(/\/art\/([0-9a-f-]{36})/i);
-    return match ? [match[1]] : [];
-  });
 }
 
 async function readHiddenIds(env: SyncEnv): Promise<string[]> {
@@ -223,7 +215,6 @@ export async function discoverHiddenCards(env: SyncEnv, characterIds: Iterable<s
   const added = found.flatMap(hiddenCardsFor);
   if (added.length === 0) return false;
 
-  await cacheArt(env, artIdsOf(added));
   const hiddenIds = new Set(await readHiddenIds(env));
   for (const character of found) hiddenIds.add(character.id);
   await env.CARDS.put(HIDDEN_KEY, JSON.stringify([...hiddenIds]));
@@ -254,7 +245,6 @@ export async function syncCatalog(env: SyncEnv): Promise<Catalog> {
   const listed = [...ssCards, ...sssCards, ...extraEvents];
   const hiddenCards = await hiddenCatalogCards(env, new Set(listed.map((card) => card.id)));
   const cards = [...listed, ...hiddenCards];
-  await cacheArt(env, artIdsOf(cards));
 
   const catalog: Catalog = {
     syncedAt: new Date().toISOString(),
@@ -275,7 +265,7 @@ export async function readCatalog(env: SyncEnv): Promise<Catalog> {
       .map((card) => ({
         ...card,
         variantId: card.variantId ?? null,
-        image: localArtPath(card.image),
+        image: artUrl(card.image),
       })),
   };
 }

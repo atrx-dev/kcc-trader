@@ -1,5 +1,5 @@
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 const MIN_COLUMN = 190;
 const COLUMN_GAP = 16;
@@ -8,12 +8,6 @@ const ROW_GAP = 22;
 function columnCount(width: number): number {
   if (width <= 0) return 1;
   return Math.max(1, Math.floor((width + COLUMN_GAP) / (MIN_COLUMN + COLUMN_GAP)));
-}
-
-const GridScrollingContext = createContext(false);
-
-export function useGridScrolling(): boolean {
-  return useContext(GridScrollingContext);
 }
 
 export function VirtualGrid<T>({
@@ -75,7 +69,6 @@ export function VirtualGrid<T>({
   const scrolling = virtualizer.isScrolling;
 
   return (
-    <GridScrollingContext.Provider value={scrolling}>
     <div ref={frameRef} className="virtual-grid" data-scrolling={scrolling ? "" : undefined}>
       <div ref={virtualizer.containerRef}>
         {rows.map((row) => {
@@ -102,6 +95,5 @@ export function VirtualGrid<T>({
         })}
       </div>
     </div>
-    </GridScrollingContext.Provider>
   );
 }
