@@ -413,7 +413,15 @@ export function App() {
   });
   const needle = query.trim().toLowerCase();
   const catalogOptions = useMemo(() => facetOptionsFor(cards), [cards]);
-  const sssCount = useMemo(() => cards.filter((card) => card.rank === "SSS").length, [cards]);
+  const heroStats = useMemo(() => {
+    const options = facetOptionsFor(sortedCatalog);
+    return {
+      cards: sortedCatalog.length,
+      sss: sortedCatalog.filter((card) => card.rank === "SSS").length,
+      developers: options.developer.length,
+      games: options.game.length,
+    };
+  }, [sortedCatalog]);
   const showcase = useMemo(() => {
     const pool = (catalog?.cards ?? []).filter((card) => card.rank === "SSS" && card.image);
     if (pool.length < 3) return [];
@@ -619,10 +627,10 @@ export function App() {
                 </h1>
                 {catalog ? (
                   <dl className="mt-3 flex flex-wrap gap-2">
-                    <StatPill value={cards.length} label="cards" />
-                    <StatPill value={sssCount} label="SSS" />
-                    <StatPill value={catalogOptions.developer.length} label="developers" />
-                    <StatPill value={catalogOptions.game.length} label="games" />
+                    <StatPill value={heroStats.cards} label="cards" />
+                    <StatPill value={heroStats.sss} label="SSS" />
+                    <StatPill value={heroStats.developers} label="developers" />
+                    <StatPill value={heroStats.games} label="games" />
                   </dl>
                 ) : (
                   <p className="mt-1.5 text-sm text-white/60">Loading the catalog…</p>

@@ -183,7 +183,7 @@ export function SettingsSheet({
               <div>
                 <h4 className="font-display text-base font-bold">Hidden rarities</h4>
                 <p className="text-sm text-white/60">
-                  Hidden rarities disappear from the catalog, your lists, search, and every count.
+                  Hidden rarities disappear from the catalog, your lists, and search.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
