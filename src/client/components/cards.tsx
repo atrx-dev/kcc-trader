@@ -100,7 +100,7 @@ export function CardFace({ card, copies = 0 }: { card: Card; copies?: number }) 
       className={holo ? "card framed-card foil" : "card framed-card"}
       data-rank={card.rank}
       data-sss-border={card.rank === "SSS" ? card.border || "starry" : undefined}
-      aria-label={`${card.name}, ${card.rank}, ${card.game} by ${card.creator}${copies > 1 ? `, ${copies} copies` : ""}`}
+      aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${copies > 1 ? `, ${copies} copies` : ""}`}
     >
       {card.image ? (
         <img className="card-artwork" src={card.image} alt="" decoding="async" />
@@ -109,7 +109,7 @@ export function CardFace({ card, copies = 0 }: { card: Card; copies?: number }) 
       )}
       <img className="card-border" src={frameUrl(card)} alt="" decoding="async" />
       <footer style={namePlateStyle(card)}>
-        <strong title={card.name}>{card.name}</strong>
+        <strong title={card.variantName ? `${card.name} (${card.variantName})` : card.name}>{card.name}</strong>
         <span title={card.game}>{card.game}</span>
         {card.creator ? <span title={`by ${card.creator}`}>by {card.creator}</span> : null}
       </footer>

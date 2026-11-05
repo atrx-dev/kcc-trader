@@ -241,7 +241,7 @@ export function formatTime(value: string): string {
 
 export function isOwned(card: Card, owned: OwnedState): boolean {
   if (card.rank === "SSS") return owned.sss.has(`${card.id}:${card.variantId ?? ""}`);
-  if (card.rank === "SS") return owned.ss.has(card.id);
+  if (card.rank === "SS") return owned.ss.has(card.variantId ? `${card.id}:${card.variantId}` : card.id);
   return false;
 }
 
@@ -255,7 +255,7 @@ export function duplicateCount(card: Card, owned: OwnedState): number {
     card.rank === "SSS"
       ? (owned.duplicates[`${card.id}:${card.variantId ?? ""}`] ?? 0)
       : card.rank === "SS"
-        ? (owned.duplicates[card.id] ?? 0)
+        ? (owned.duplicates[card.variantId ? `${card.id}:${card.variantId}` : card.id] ?? 0)
         : 0;
   return count > 1 ? count : 0;
 }

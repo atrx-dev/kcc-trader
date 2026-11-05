@@ -1,8 +1,9 @@
-import type { Card, CardCategory, Catalog } from "./types.ts";
+import { cardKey, type Card, type CardCategory, type Catalog } from "./types.ts";
 
 const ORIGIN = "https://koi-card-collector.com";
 const MAX_PAGES = 40;
 const HIDDEN_KEY = "hidden-characters";
+const SS_ARTWORK_KEY = "ss-artwork";
 const MAX_DISCOVERIES = 5;
 const SYNC_STATE_KEY = "catalog-sync";
 const REQUEST_BUDGET = 40;
@@ -257,7 +258,33 @@ async function listDex(run: SyncRun, listing: NonNullable<SyncRun["listing"]>): 
   } else run.listing = null;
 }
 
-function finishRun(run: SyncRun): Catalog {
+export async function readSsArtwork(env: SyncEnv): Promise<Card[]> {
+  return (await env.CARDS.get<Card[]>(SS_ARTWORK_KEY, "json")) ?? [];
+}
+
+export async function addSsArtwork(env: SyncEnv, cards: Card[]): Promise<boolean> {
+  if (cards.length === 0) return false;
+  const stored = await readSsArtwork(env);
+  const byKey = new Map(stored.map((card) => [cardKey(card), card]));
+  let added = false;
+  for (const card of cards) {
+    const key = cardKey(card);
+    if (byKey.has(key)) continue;
+    byKey.set(key, card);
+    added = true;
+  }
+  if (!added) return false;
+  await env.CARDS.put(SS_ARTWORK_KEY, JSON.stringify([...byKey.values()]));
+  const catalog = await readCatalog(env);
+  if (!catalog.syncedAt) return false;
+  const known = new Set(catalog.cards.map((card) => cardKey(card)));
+  const extra = [...byKey.values()].filter((card) => !known.has(cardKey(card)));
+  if (extra.length === 0) return false;
+  await env.CARDS.put("catalog", JSON.stringify({ ...catalog, cards: [...catalog.cards, ...extra] }));
+  return true;
+}
+
+function finishRun(run: SyncRun, artwork: Card[]): Catalog {
   const seenVariants = new Set(
     run.cards
       .filter((card) => card.rank === "SSS")
@@ -267,7 +294,7 @@ function finishRun(run: SyncRun): Catalog {
   const extraEvents = run.eventCards.filter((card) => !card.variantId || !seenVariants.has(card.variantId));
   return {
     syncedAt: new Date().toISOString(),
-    cards: [...run.cards, ...extraEvents, ...(run.hidden?.cards ?? [])],
+    cards: [...run.cards, ...extraEvents, ...(run.hidden?.cards ?? []), ...artwork],
   };
 }
 
@@ -327,7 +354,9 @@ export async function stepCatalogSync(env: SyncEnv, force = false): Promise<Sync
     return { status: "running", remaining: run.pending.length + (run.hidden?.pending.length ?? 0) };
   }
 
-  const catalog = finishRun(run);
+  const seen = new Set([...run.cards, ...run.eventCards, ...(run.hidden?.cards ?? [])].map((card) => cardKey(card)));
+  const artwork = (await readSsArtwork(env)).filter((card) => !seen.has(cardKey(card)));
+  const catalog = finishRun(run, artwork);
   await env.CARDS.put("catalog", JSON.stringify(catalog));
   if (run.hidden.keep.length !== run.hidden.stored) await env.CARDS.put(HIDDEN_KEY, JSON.stringify(run.hidden.keep));
   await env.CARDS.put(SYNC_STATE_KEY, JSON.stringify({ finishedAt: catalog.syncedAt }));

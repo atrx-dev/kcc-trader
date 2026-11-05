@@ -1,3 +1,6 @@
+import { artUrl } from "./sync.ts";
+import { type Card } from "./types.ts";
+
 const ORIGIN = "https://koi-card-collector.com";
 const MAX_PAGES = 40;
 const POOL = 6;
@@ -13,7 +16,13 @@ export interface OwnedCards {
   fetchedAt: string;
 }
 
-export type OwnedResponse = OwnedCards & { nextSyncAt: string; previousDuplicates?: Record<string, number> };
+export type OwnedResponse = OwnedCards & {
+  nextSyncAt: string;
+  previousDuplicates?: Record<string, number>;
+  artwork: Card[];
+};
+
+type CachedOwned = OwnedCards & { nextSyncAt: string };
 
 export class SyncCooldownError extends Error {
   constructor(readonly nextSyncAt: string) {
@@ -21,9 +30,15 @@ export class SyncCooldownError extends Error {
   }
 }
 
-function withNextSync(owned: OwnedCards): OwnedResponse {
+function withNextSync(owned: OwnedCards): CachedOwned {
   const nextSyncAt = new Date(Date.parse(owned.fetchedAt) + SYNC_COOLDOWN_MS).toISOString();
   return { ...owned, nextSyncAt };
+}
+
+interface CollectionVariant {
+  id?: string;
+  name?: string;
+  art?: { crop?: string };
 }
 
 interface CollectionPage {
@@ -33,7 +48,12 @@ interface CollectionPage {
     copy?: {
       characterId?: string;
       rank?: string;
-      variant?: { id?: string } | null;
+      variant?: CollectionVariant | null;
+    };
+    character?: {
+      name?: string;
+      game?: string;
+      creator?: string;
     };
   }[];
 }
@@ -60,7 +80,29 @@ function reachesUntracked(page: CollectionPage): boolean {
   return (page.cards ?? []).some((entry) => entry.copy?.characterId && !isTracked(entry.copy.rank));
 }
 
-async function fetchOwned(profileId: string): Promise<OwnedCards> {
+function legacySsCard(
+  characterId: string,
+  character: { name?: string; game?: string; creator?: string },
+  variant: CollectionVariant,
+): Card | null {
+  const image = artUrl(variant.art?.crop);
+  if (!variant.id || !character.name || !image) return null;
+  return {
+    id: characterId,
+    name: character.name,
+    game: character.game ?? "",
+    creator: character.creator ?? "",
+    rank: "SS",
+    category: "characters",
+    eventName: null,
+    variantId: variant.id,
+    variantName: variant.name || "SS artwork",
+    border: null,
+    image,
+  };
+}
+
+async function fetchOwned(profileId: string): Promise<{ owned: OwnedCards; artwork: Card[] }> {
   const first = await fetchPage(profileId, 0);
   const perPage = first.cards?.length ?? 0;
   const total = first.total ?? perPage;
@@ -80,40 +122,55 @@ async function fetchOwned(profileId: string): Promise<OwnedCards> {
 
   const ss = new Map<string, number>();
   const sss = new Map<string, number>();
+  const artwork = new Map<string, Card>();
   let copies = 0;
   for (const page of pages) {
     for (const entry of page.cards ?? []) {
       const copy = entry.copy;
       if (!copy?.characterId || !isTracked(copy.rank)) continue;
       copies += 1;
-      const [counts, key] =
-        copy.rank === "SSS" ? [sss, `${copy.characterId}:${copy.variant?.id ?? ""}`] : [ss, copy.characterId];
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+      if (copy.rank === "SSS") {
+        const key = `${copy.characterId}:${copy.variant?.id ?? ""}`;
+        sss.set(key, (sss.get(key) ?? 0) + 1);
+        continue;
+      }
+      const variantId = copy.variant?.id;
+      if (!variantId) {
+        ss.set(copy.characterId, (ss.get(copy.characterId) ?? 0) + 1);
+        continue;
+      }
+      const key = `${copy.characterId}:${variantId}`;
+      ss.set(key, (ss.get(key) ?? 0) + 1);
+      const card = legacySsCard(copy.characterId, entry.character ?? {}, copy.variant ?? {});
+      if (card) artwork.set(key, card);
     }
   }
 
   return {
-    ss: [...ss.keys()],
-    sss: [...sss.keys()],
-    duplicates: Object.fromEntries([...ss, ...sss].filter(([, count]) => count > 1)),
-    copies,
-    hidden: Boolean(first.hidden),
-    complete: done,
-    fetchedAt: new Date().toISOString(),
+    owned: {
+      ss: [...ss.keys()],
+      sss: [...sss.keys()],
+      duplicates: Object.fromEntries([...ss, ...sss].filter(([, count]) => count > 1)),
+      copies,
+      hidden: Boolean(first.hidden),
+      complete: done,
+      fetchedAt: new Date().toISOString(),
+    },
+    artwork: [...artwork.values()],
   };
 }
 
 export function ownsCard(owned: OwnedCards, key: string): boolean {
   const [id = "", variantId = "", rank = ""] = key.split(":");
   if (rank === "SSS") return owned.sss.includes(`${id}:${variantId}`);
-  if (rank === "SS") return owned.ss.includes(id);
+  if (rank === "SS") return owned.ss.includes(variantId ? `${id}:${variantId}` : id);
   return false;
 }
 
 function ownedKey(key: string): string | null {
   const [id = "", variantId = "", rank = ""] = key.split(":");
   if (rank === "SSS") return `${id}:${variantId}`;
-  if (rank === "SS") return id;
+  if (rank === "SS") return variantId ? `${id}:${variantId}` : id;
   return null;
 }
 
@@ -127,10 +184,10 @@ export async function readOwned(env: OwnedEnv, profileId: string, refresh: boole
   const cached = await env.CARDS.get<OwnedCards>(cacheKey, "json");
   if (cached && Array.isArray(cached.ss)) {
     const response = withNextSync(cached);
-    if (!refresh) return response;
+    if (!refresh) return { ...response, artwork: [] };
     if (Date.parse(response.nextSyncAt) > Date.now()) throw new SyncCooldownError(response.nextSyncAt);
   }
-  const owned = await fetchOwned(profileId);
+  const { owned, artwork } = await fetchOwned(profileId);
   await env.CARDS.put(cacheKey, JSON.stringify(owned));
-  return { ...withNextSync(owned), previousDuplicates: cached?.duplicates ?? {} };
+  return { ...withNextSync(owned), previousDuplicates: cached?.duplicates ?? {}, artwork };
 }

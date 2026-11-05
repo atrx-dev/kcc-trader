@@ -13,7 +13,7 @@ import {
 } from "./lists.ts";
 import { isSpare, ownsCard, readOwned, SyncCooldownError, type OwnedResponse } from "./owned.ts";
 import { profileEmbed, withProfileMeta } from "./embed.ts";
-import { discoverHiddenCards, readCatalog, stepCatalogSync } from "./sync.ts";
+import { addSsArtwork, discoverHiddenCards, readCatalog, stepCatalogSync } from "./sync.ts";
 import { findTrades } from "./trades.ts";
 import { cardKey } from "./types.ts";
 
@@ -92,10 +92,11 @@ export default {
       if (!user.profile) return Response.json({ error: "No public KCC profile" }, { status: 404 });
       try {
         const owned = await readOwned(env, user.profile.id, request.method === "POST");
-        const characterIds = [...owned.ss, ...owned.sss.map((key) => key.split(":")[0])];
-        const catalogChanged = await discoverHiddenCards(env, characterIds).catch(() => false);
+        const artworkAdded = await addSsArtwork(env, owned.artwork);
+        const characterIds = [...owned.ss, ...owned.sss].map((key) => key.split(":")[0]);
+        const catalogChanged = artworkAdded || (await discoverHiddenCards(env, characterIds).catch(() => false));
         const listSync = await syncOwnedLists(env, user.id, owned);
-        const { previousDuplicates: _, ...cards } = owned;
+        const { previousDuplicates: _, artwork: __, ...cards } = owned;
         return Response.json({ ...cards, catalogChanged, listSync });
       } catch (error) {
         if (error instanceof SyncCooldownError) {
@@ -185,7 +186,10 @@ export default {
           if (!(error instanceof SyncCooldownError)) throw error;
           return null;
         });
-        if (owned) await syncOwnedLists(env, user.id, owned);
+        if (owned) {
+          await addSsArtwork(env, owned.artwork);
+          await syncOwnedLists(env, user.id, owned);
+        }
       });
     }
 

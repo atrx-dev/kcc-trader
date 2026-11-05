@@ -400,7 +400,10 @@ export function App() {
   const sortedCatalog = useMemo(
     () =>
       [...(catalog?.cards ?? [])].sort(
-        (a, b) => RANK_ORDER.indexOf(b.rank) - RANK_ORDER.indexOf(a.rank) || a.name.localeCompare(b.name),
+        (a, b) =>
+          RANK_ORDER.indexOf(b.rank) - RANK_ORDER.indexOf(a.rank) ||
+          a.name.localeCompare(b.name) ||
+          (a.variantName ?? "").localeCompare(b.variantName ?? ""),
       ),
     [catalog],
   );
