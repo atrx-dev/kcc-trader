@@ -202,7 +202,9 @@ export default {
       const headers = new Headers(request.headers);
       headers.delete("if-none-match");
       headers.delete("if-modified-since");
-      const shellRequest = new Request(new URL("/index.html", url), { headers });
+      // /index.html redirects to / in production. Following that redirect fetches this
+      // worker's own hostname, which Cloudflare answers with 522.
+      const shellRequest = new Request(new URL("/", url), { headers, redirect: "manual" });
       const shell = await (env.ASSETS ? env.ASSETS.fetch(shellRequest) : fetch(shellRequest));
       if (!shell.ok || !shell.body) return shell;
       const lists = await readPublicLists(env, profilePath[1]);
