@@ -166,7 +166,8 @@ export function SettingsSheet({
                     Card effects
                   </h4>
                   <p className="text-sm text-white/60">
-                    Foil shine and sparkles on cards. Turn off for a calmer, lighter grid.
+                    Foil shine and sparkles on cards.{" "}
+                    <span className="text-amber-200">Enabling this may cause the page to lag.</span>
                   </p>
                 </div>
                 <Switch

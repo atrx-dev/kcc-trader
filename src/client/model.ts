@@ -143,7 +143,7 @@ export interface Settings {
 }
 
 export const SETTINGS_KEY = "kcc-trader:settings";
-export const DEFAULT_SETTINGS: Settings = { hiddenRarities: [], catalogDefaults: NO_FILTERS, cardEffects: true };
+export const DEFAULT_SETTINGS: Settings = { hiddenRarities: [], catalogDefaults: NO_FILTERS, cardEffects: false };
 
 export function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
@@ -171,7 +171,7 @@ export function loadSettings(): Settings {
               ? "duplicates"
               : "all",
       },
-      cardEffects: raw.cardEffects !== false,
+      cardEffects: raw.cardEffects === true,
     };
   } catch {
     return DEFAULT_SETTINGS;
