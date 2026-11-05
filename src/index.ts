@@ -199,13 +199,10 @@ export default {
 
     const profilePath = url.pathname.match(/^\/u\/(\d{5,25})\/?$/);
     if (profilePath && (request.method === "GET" || request.method === "HEAD")) {
-      const headers = new Headers(request.headers);
-      headers.delete("if-none-match");
-      headers.delete("if-modified-since");
-      // /index.html redirects to / in production. Following that redirect fetches this
-      // worker's own hostname, which Cloudflare answers with 522.
-      const shellRequest = new Request(new URL("/", url), { headers, redirect: "manual" });
-      const shell = await (env.ASSETS ? env.ASSETS.fetch(shellRequest) : fetch(shellRequest));
+      // Fetch the shell through the assets binding. A plain fetch() to this worker's own
+      // hostname is what Cloudflare answers with 522.
+      const shellRequest = new Request(new URL("/", url), { redirect: "manual" });
+      const shell = env.ASSETS ? await env.ASSETS.fetch(shellRequest) : await fetch(shellRequest);
       if (!shell.ok || !shell.body) return shell;
       const lists = await readPublicLists(env, profilePath[1]);
       const pageUrl = new URL(`/u/${profilePath[1]}`, url.origin).href;
