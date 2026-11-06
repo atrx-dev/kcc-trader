@@ -13,6 +13,8 @@ import { ProfilePage } from "./pages/ProfilePage.tsx";
 import { TradesPage } from "./pages/TradesPage.tsx";
 import { ListPage } from "./pages/ListPage.tsx";
 import { HelpPage } from "./pages/HelpPage.tsx";
+import { FeatureDialog } from "./components/FeatureDialog.tsx";
+import { SEEN_FEATURE_KEY, unseenFeatures } from "./features.ts";
 
 const INITIAL_PAGE = pageFromPath(window.location.pathname);
 const INITIAL_URL_STATE = readUrlState(window.location.search);
@@ -40,6 +42,8 @@ export function App() {
   const [listError, setListError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const [listsReady, setListsReady] = useState(false);
+  const [featureNotes, setFeatureNotes] = useState(() => unseenFeatures(window.localStorage.getItem(SEEN_FEATURE_KEY)));
   const [page, setPage] = useState<Page>(INITIAL_PAGE);
   const [profileId, setProfileId] = useState(() => profileIdFromPath(window.location.pathname));
   const [query, setQuery] = useState(INITIAL_URL_STATE.query);
@@ -122,10 +126,13 @@ export function App() {
   useEffect(() => {
     pendingChanges.current = [];
     savedLists.current = NO_LISTS;
+    if (!userLoaded) return;
     if (!user) {
       setLists(NO_LISTS);
+      setListsReady(true);
       return;
     }
+    setListsReady(false);
     const controller = new AbortController();
     fetch("/api/lists", { signal: controller.signal })
       .then((response) => {
@@ -137,9 +144,12 @@ export function App() {
       .catch((cause: unknown) => {
         if (cause instanceof DOMException && cause.name === "AbortError") return;
         setListError(cause instanceof Error ? cause.message : "Could not load your lists");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setListsReady(true);
       });
     return () => controller.abort();
-  }, [user]);
+  }, [user, userLoaded]);
 
   useEffect(() => {
     if (!user) {
@@ -257,6 +267,17 @@ export function App() {
   function confirmProfilePublic() {
     dismissWelcome();
     void syncOwned(true);
+  }
+
+  function dismissFeatures() {
+    const latest = featureNotes.at(-1);
+    if (latest) window.localStorage.setItem(SEEN_FEATURE_KEY, latest.id);
+    setFeatureNotes([]);
+  }
+
+  function disableFeatures() {
+    dismissFeatures();
+    updateSettings({ ...settings, featureNotes: false });
   }
 
   function applyListSync(sync: ListSync | null | undefined) {
@@ -400,6 +421,7 @@ export function App() {
       hiddenRarities: next.hiddenRarities,
       catalogDefaults: withoutRarities(next.catalogDefaults, next.hiddenRarities),
       cardEffects: next.cardEffects,
+      featureNotes: next.featureNotes,
     };
     setSettings(cleaned);
     window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(cleaned));
@@ -613,6 +635,12 @@ export function App() {
           onDismiss={dismissWelcome}
           onConfirm={confirmProfilePublic}
           profileHref={`https://koi-card-collector.com/profile/${user?.id ?? ""}`}
+        />
+        <FeatureDialog
+          open={settings.featureNotes && listsReady && !welcomeOpen && featureNotes.length > 0}
+          notes={featureNotes}
+          onDismiss={dismissFeatures}
+          onDisable={disableFeatures}
         />
 
         {page === "help" ? (

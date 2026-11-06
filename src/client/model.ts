@@ -142,10 +142,16 @@ export interface Settings {
   hiddenRarities: string[];
   catalogDefaults: Filters;
   cardEffects: boolean;
+  featureNotes: boolean;
 }
 
 export const SETTINGS_KEY = "kcc-trader:settings";
-export const DEFAULT_SETTINGS: Settings = { hiddenRarities: [], catalogDefaults: NO_FILTERS, cardEffects: false };
+export const DEFAULT_SETTINGS: Settings = {
+  hiddenRarities: [],
+  catalogDefaults: NO_FILTERS,
+  cardEffects: false,
+  featureNotes: true,
+};
 
 export function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
@@ -157,6 +163,7 @@ export function loadSettings(): Settings {
       hiddenRarities?: unknown;
       catalogDefaults?: { facets?: Partial<Record<FacetId, unknown>>; owned?: unknown; duplicates?: unknown };
       cardEffects?: unknown;
+      featureNotes?: unknown;
     } | null;
     if (!raw) return DEFAULT_SETTINGS;
     const facets = { ...NO_FACETS };
@@ -174,6 +181,7 @@ export function loadSettings(): Settings {
               : "all",
       },
       cardEffects: raw.cardEffects === true,
+      featureNotes: raw.featureNotes !== false,
     };
   } catch {
     return DEFAULT_SETTINGS;
