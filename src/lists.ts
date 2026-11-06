@@ -19,6 +19,7 @@ export interface ListChange {
   list: ListName;
   key: string;
   present: boolean;
+  auto?: boolean;
 }
 
 export interface Preferences {
@@ -69,10 +70,11 @@ export function parseChanges(value: unknown): ListChange[] | null {
   const changes: ListChange[] = [];
   for (const item of value) {
     if (!item || typeof item !== "object") return null;
-    const { list, key, present } = item as Record<string, unknown>;
+    const { list, key, present, auto } = item as Record<string, unknown>;
     if (list !== "forTrade" && list !== "wishlist") return null;
     if (typeof key !== "string" || !KEY_PATTERN.test(key) || typeof present !== "boolean") return null;
-    changes.push({ list, key, present });
+    if (auto !== undefined && typeof auto !== "boolean") return null;
+    changes.push({ list, key, present, auto: auto === true });
   }
   return changes;
 }
@@ -255,7 +257,7 @@ export async function changeLists(
   const writes: D1PreparedStatement[] = [saveTrader(env, trader)];
   let full = false;
 
-  changes.forEach(({ list, key, present }, index) => {
+  changes.forEach(({ list, key, present, auto }, index) => {
     if (!present) {
       members[list].delete(key);
       writes.push(
@@ -274,9 +276,9 @@ export async function changeLists(
     members[list].add(key);
     writes.push(
       env.DB.prepare(
-        `INSERT INTO list_entries (trader_id, list, card_key, added_at) VALUES (?, ?, ?, ?)
-         ON CONFLICT (trader_id, list, card_key) DO UPDATE SET added_at = excluded.added_at, auto = 0`,
-      ).bind(trader.id, list, key, now + index),
+        `INSERT INTO list_entries (trader_id, list, card_key, added_at, auto) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (trader_id, list, card_key) DO UPDATE SET added_at = excluded.added_at, auto = excluded.auto`,
+      ).bind(trader.id, list, key, now + index, list === "forTrade" && auto ? 1 : 0),
     );
   });
 

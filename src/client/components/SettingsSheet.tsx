@@ -144,7 +144,7 @@ export function SettingsSheet({
                     {listDuplicates === null
                       ? "Sign in to have spare copies listed for trade when your collection syncs."
                       : listDuplicates
-                        ? "When your collection syncs, new spare copies go on your For trade list, and come off once they're no longer spare."
+                        ? "When your collection syncs, new spare copies go on your For trade list, and come off once they're no longer spare. So do cards you add with List them. Cards you add yourself stay listed."
                         : "Spare copies are only listed for trade when you add them yourself."}
                   </p>
                 </div>

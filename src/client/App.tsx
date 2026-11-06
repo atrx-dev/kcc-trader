@@ -273,13 +273,13 @@ export function App() {
     setNotice(sentences.join(" "));
   }
 
-  function toggle(list: ListName, key: string, present: boolean) {
+  function toggle(list: ListName, key: string, present: boolean, auto = false) {
     if (!user) {
       setListError("Sign in with Discord to edit your lists.");
       return;
     }
     setListError(null);
-    const change = { list, key, present };
+    const change = { list, key, present, ...(auto ? { auto: true } : {}) };
     pendingChanges.current = [
       ...pendingChanges.current.filter((item) => item.list !== list || item.key !== key),
       change,

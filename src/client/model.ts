@@ -40,6 +40,7 @@ export interface ListChange {
   list: ListName;
   key: string;
   present: boolean;
+  auto?: boolean;
 }
 
 export const NO_LISTS: Lists = { forTrade: [], wishlist: [] };

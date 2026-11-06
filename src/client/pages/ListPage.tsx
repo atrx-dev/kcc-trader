@@ -45,7 +45,7 @@ export function ListPage({
   searchBlocked: boolean;
   query: string;
   onQuery: (value: string) => void;
-  onToggle: (list: ListName, key: string, present: boolean) => void;
+  onToggle: (list: ListName, key: string, present: boolean, auto?: boolean) => void;
   unlistedDuplicates: Card[];
   owned: OwnedState;
 }) {
@@ -167,7 +167,7 @@ export function ListPage({
               <Button
                 size="sm"
                 className="rounded-full bg-sky-300 text-sky-950 hover:bg-sky-200"
-                onClick={() => unlistedDuplicates.forEach((card) => onToggle(list, cardKey(card), true))}
+                onClick={() => unlistedDuplicates.forEach((card) => onToggle(list, cardKey(card), true, true))}
               >
                 <Plus />
                 {unlistedDuplicates.length === 1 ? "List it" : "List them"}
