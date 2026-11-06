@@ -34,7 +34,7 @@ export interface ListSync {
 }
 
 export type ListName = "forTrade" | "wishlist";
-export type Page = "catalog" | ListName | "trades" | "profile";
+export type Page = "catalog" | ListName | "trades" | "profile" | "help";
 
 export interface ListChange {
   list: ListName;
@@ -135,6 +135,7 @@ export const NO_PAGE_FILTERS: Record<Page, Filters> = {
   wishlist: NO_FILTERS,
   trades: NO_FILTERS,
   profile: NO_FILTERS,
+  help: NO_FILTERS,
 };
 
 export interface Settings {
@@ -308,6 +309,7 @@ export const LIST_COPY: Record<
 export const ACTIONS_HEIGHT = 34;
 
 export function pageFromPath(path: string): Page {
+  if (path === "/help" || path === "/help/") return "help";
   if (path === "/for-trade") return "forTrade";
   if (path === "/wishlist" || path === "/wanted") return "wishlist";
   if (path === "/trades") return "trades";

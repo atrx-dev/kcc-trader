@@ -1,4 +1,4 @@
-import { LogIn, LogOut, Sparkles } from "lucide-react";
+import { CircleHelp, LogIn, LogOut, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -104,6 +104,28 @@ export function NavTabs({
         );
       })}
     </nav>
+  );
+}
+
+export function HelpButton({ onOpen }: { onOpen: (page: Page, href: string) => void }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button asChild variant="ghost" size="icon" className="rounded-full text-white/70">
+          <a
+            href="/help"
+            aria-label="Help"
+            onClick={(event) => {
+              event.preventDefault();
+              onOpen("help", "/help");
+            }}
+          >
+            <CircleHelp />
+          </a>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Help</TooltipContent>
+    </Tooltip>
   );
 }
 

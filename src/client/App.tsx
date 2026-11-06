@@ -5,13 +5,14 @@ import { cardKey, type Card, type Catalog } from "../types.ts";
 import { VirtualGrid } from "./VirtualGrid.tsx";
 import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters } from "./model.ts";
 import { CardFace } from "./components/cards.tsx";
-import { formatSyncedAt, Brand, NavTabs, AccountMenu } from "./components/header.tsx";
+import { formatSyncedAt, Brand, NavTabs, AccountMenu, HelpButton } from "./components/header.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
 import { SettingsSheet } from "./components/SettingsSheet.tsx";
 import { EmptyState, Banner, GridSkeleton, Showcase, StatPill, WelcomeDialog } from "./components/common.tsx";
 import { ProfilePage } from "./pages/ProfilePage.tsx";
 import { TradesPage } from "./pages/TradesPage.tsx";
 import { ListPage } from "./pages/ListPage.tsx";
+import { HelpPage } from "./pages/HelpPage.tsx";
 
 const INITIAL_PAGE = pageFromPath(window.location.pathname);
 const INITIAL_URL_STATE = readUrlState(window.location.search);
@@ -532,6 +533,7 @@ export function App() {
     wishlist: user && catalog ? lists.wishlist.filter((key) => byKey.has(key)).length : null,
     trades: null,
     profile: null,
+    help: null,
   };
   const tradeMatches = useMemo(
     () =>
@@ -551,6 +553,7 @@ export function App() {
           <Brand onOpen={openPage} />
           <NavTabs page={page} counts={counts} onOpen={openPage} className="mx-auto hidden lg:flex" />
           <div className="ml-auto flex items-center gap-1 lg:ml-0">
+            <HelpButton onOpen={openPage} />
             <SettingsSheet
               settings={settings}
               onChange={updateSettings}
@@ -612,7 +615,9 @@ export function App() {
           profileHref={`https://koi-card-collector.com/profile/${user?.id ?? ""}`}
         />
 
-        {page === "profile" && profileId ? (
+        {page === "help" ? (
+          <HelpPage onOpen={openPage} />
+        ) : page === "profile" && profileId ? (
           <ProfilePage
             key={profileId}
             profileId={profileId}
@@ -764,6 +769,17 @@ export function App() {
           {catalog?.syncedAt ? ` · synced ${formatSyncedAt(catalog.syncedAt)}` : ""}
         </p>
         <p>
+          <a
+            href="/help"
+            onClick={(event) => {
+              event.preventDefault();
+              openPage("help", "/help");
+            }}
+            className="text-white/60 underline-offset-2 hover:text-white hover:underline"
+          >
+            Help
+          </a>
+          {" · "}
           Found a bug? Message{" "}
           <a
             href="https://discord.com/users/204699700316602369"
