@@ -101,14 +101,11 @@ function PriorityToggle({ active, onClick }: { active: boolean; onClick: () => v
       aria-label={active ? "Remove priority" : "Mark as priority"}
       onClick={onClick}
       className={cn(
-        "absolute top-3 right-3 z-10 inline-flex items-center justify-center rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.5)] outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-        active
-          ? "gap-1 bg-[#f3d58f] px-1.5 py-1 text-[11px] leading-none font-bold text-[#1b1509]"
-          : "size-8 bg-black/55 text-white/85 hover:bg-black/70 hover:text-white",
+        "absolute top-3 right-3 z-10 inline-flex size-8 items-center justify-center rounded-full bg-black/55 shadow-[0_2px_10px_rgba(0,0,0,0.5)] outline-none hover:bg-black/70 focus-visible:ring-3 focus-visible:ring-ring/50",
+        active ? "text-[#f3d58f]" : "text-white/85 hover:text-white",
       )}
     >
-      <Star className={cn(active ? "size-3 fill-current" : "size-4")} />
-      {active ? "Priority" : null}
+      <Star className={cn("size-4", active && "fill-current")} />
     </button>
   );
 }
