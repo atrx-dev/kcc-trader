@@ -298,16 +298,25 @@ export function FilterBar({
             />
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full text-white/70"
-                  aria-label="Sync collection"
-                  disabled={ownedControls.syncDisabled}
-                  onClick={ownedControls.onSync}
+                <span
+                  className={cn(
+                    "inline-flex rounded-full",
+                    ownedControls.syncDisabled && "cursor-not-allowed outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  )}
+                  tabIndex={ownedControls.syncDisabled ? 0 : undefined}
+                  aria-label={ownedControls.syncDisabled ? ownedControls.syncHint : undefined}
                 >
-                  <RefreshCw className={cn(ownedControls.syncing && "animate-spin")} />
-                </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full text-white/70"
+                    aria-label="Sync collection"
+                    disabled={ownedControls.syncDisabled}
+                    onClick={ownedControls.onSync}
+                  >
+                    <RefreshCw className={cn(ownedControls.syncing && "animate-spin")} />
+                  </Button>
+                </span>
               </TooltipTrigger>
               <TooltipContent>{ownedControls.syncHint}</TooltipContent>
             </Tooltip>
