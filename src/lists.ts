@@ -51,6 +51,7 @@ export interface TraderRow {
   prune_wishlist?: number;
   list_duplicates?: number;
   last_seen_at: number;
+  introduced?: number;
 }
 
 interface EntryRow {
@@ -63,7 +64,7 @@ const MAX_PER_LIST = 400;
 const MAX_CHANGES = 200;
 const SEEN_RESOLUTION = 60 * 60 * 1000;
 export const TRADER_COLUMNS =
-  "traders.id, traders.name, traders.username, traders.avatar_url, traders.kcc_name, traders.kcc_id, traders.accepting, traders.prune_wishlist, traders.list_duplicates, traders.last_seen_at";
+  "traders.id, traders.name, traders.username, traders.avatar_url, traders.kcc_name, traders.kcc_id, traders.accepting, traders.prune_wishlist, traders.list_duplicates, traders.last_seen_at, traders.introduced";
 
 export function parseChanges(value: unknown): ListChange[] | null {
   if (!Array.isArray(value) || value.length === 0 || value.length > MAX_CHANGES) return null;
@@ -97,8 +98,8 @@ function flag(value: boolean | undefined): number | null {
 
 function saveTrader(env: ListEnv, trader: Trader, preferences: Partial<Preferences> = {}): D1PreparedStatement {
   return env.DB.prepare(
-    `INSERT INTO traders (id, name, username, avatar_url, kcc_name, kcc_id, accepting, prune_wishlist, list_duplicates, last_seen_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, COALESCE(?7, 1), COALESCE(?8, 1), COALESCE(?10, 0), ?9)
+    `INSERT INTO traders (id, name, username, avatar_url, kcc_name, kcc_id, accepting, prune_wishlist, list_duplicates, last_seen_at, introduced)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, COALESCE(?7, 1), COALESCE(?8, 1), COALESCE(?10, 0), ?9, 0)
      ON CONFLICT (id) DO UPDATE SET
        name = excluded.name,
        username = excluded.username,
@@ -158,13 +159,18 @@ function responseFrom(trader: D1Result, entries: D1Result): ListsResponse {
   };
 }
 
-export async function readLists(env: ListEnv, trader: Trader): Promise<ListsResponse> {
+export async function readLists(env: ListEnv, trader: Trader): Promise<ListsResponse & { welcome: boolean }> {
   const [, row, entries] = await env.DB.batch([
     saveTrader(env, trader),
     selectTrader(env, trader.id),
     selectEntries(env, trader.id),
   ]);
-  return responseFrom(row, entries);
+  const stored = row.results[0] as TraderRow | undefined;
+  return { ...responseFrom(row, entries), welcome: stored?.introduced === 0 };
+}
+
+export function markIntroduced(env: ListEnv, traderId: string): Promise<D1Result> {
+  return env.DB.prepare("UPDATE traders SET introduced = 1 WHERE id = ?").bind(traderId).run();
 }
 
 export async function setPreferences(

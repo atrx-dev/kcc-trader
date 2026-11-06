@@ -190,6 +190,8 @@ export const OWNED_CHOICES: { value: OwnedFilter; label: string }[] = [
   { value: "duplicates", label: "Duplicates" },
 ];
 
+export const VISIT_SYNC_MS = 12 * 60 * 60 * 1000;
+
 export const NO_OWNED: OwnedState = {
   status: "idle",
   ss: new Set(),
@@ -221,8 +223,9 @@ export function ownedFromResponse(data: OwnedCards): OwnedState {
 export async function requestOwned(
   method: "GET" | "POST",
   signal?: AbortSignal,
+  force = false,
 ): Promise<{ state: OwnedState; catalogChanged: boolean; listSync: ListSync | null }> {
-  const response = await fetch("/api/owned", { method, signal });
+  const response = await fetch(force ? "/api/owned?force=1" : "/api/owned", { method, signal });
   if (response.status === 429) {
     const body = (await response.json().catch(() => null)) as { nextSyncAt?: string } | null;
     if (body?.nextSyncAt) throw new SyncCooldownError(body.nextSyncAt);

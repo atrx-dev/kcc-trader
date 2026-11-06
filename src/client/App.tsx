@@ -3,12 +3,12 @@ import { RotateCcw, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cardKey, type Card, type Catalog } from "../types.ts";
 import { VirtualGrid } from "./VirtualGrid.tsx";
-import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters } from "./model.ts";
+import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters } from "./model.ts";
 import { CardFace } from "./components/cards.tsx";
 import { formatSyncedAt, Brand, NavTabs, AccountMenu } from "./components/header.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
 import { SettingsSheet } from "./components/SettingsSheet.tsx";
-import { EmptyState, Banner, GridSkeleton, Showcase, StatPill } from "./components/common.tsx";
+import { EmptyState, Banner, GridSkeleton, Showcase, StatPill, WelcomeDialog } from "./components/common.tsx";
 import { ProfilePage } from "./pages/ProfilePage.tsx";
 import { TradesPage } from "./pages/TradesPage.tsx";
 import { ListPage } from "./pages/ListPage.tsx";
@@ -38,6 +38,7 @@ export function App() {
   const [listsSaved, setListsSaved] = useState(0);
   const [listError, setListError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
   const [page, setPage] = useState<Page>(INITIAL_PAGE);
   const [profileId, setProfileId] = useState(() => profileIdFromPath(window.location.pathname));
   const [query, setQuery] = useState(INITIAL_URL_STATE.query);
@@ -160,9 +161,12 @@ export function App() {
     const controller = new AbortController();
     requestOwned("GET", controller.signal)
       .then(({ state, catalogChanged, listSync }) => {
+        if (controller.signal.aborted) return;
         setOwned(state);
         if (catalogChanged) setCatalogVersion((version) => version + 1);
         applyListSync(listSync);
+        const fetched = state.fetchedAt ? Date.parse(state.fetchedAt) : NaN;
+        if (!Number.isFinite(fetched) || Date.now() - fetched >= VISIT_SYNC_MS) void syncOwned();
       })
       .catch((cause: unknown) => {
         if (cause instanceof DOMException && cause.name === "AbortError") return;
@@ -192,11 +196,11 @@ export function App() {
     return () => controller.abort();
   }, [user, page, listsSaved, tradesVersion]);
 
-  async function syncOwned() {
+  async function syncOwned(force = false) {
     setOwnedSyncFailed(false);
     setOwned((current) => ({ ...current, syncing: true }));
     try {
-      const { state, catalogChanged, listSync } = await requestOwned("POST");
+      const { state, catalogChanged, listSync } = await requestOwned("POST", undefined, force);
       setOwned(state);
       if (catalogChanged) setCatalogVersion((version) => version + 1);
       applyListSync(listSync);
@@ -233,9 +237,25 @@ export function App() {
     window.scrollTo({ top: 0 });
   }
 
-  function receiveLists(data: Lists) {
-    savedLists.current = data;
-    setLists(withChanges(data, pendingChanges.current));
+  function receiveLists(data: Lists & { welcome?: boolean }) {
+    const { welcome, ...lists } = data;
+    savedLists.current = lists;
+    setLists(withChanges(lists, pendingChanges.current));
+    if (welcome) setWelcomeOpen(true);
+  }
+
+  function dismissWelcome() {
+    setWelcomeOpen(false);
+    void fetch("/api/preferences", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ introduced: true }),
+    });
+  }
+
+  function confirmProfilePublic() {
+    dismissWelcome();
+    void syncOwned(true);
   }
 
   function applyListSync(sync: ListSync | null | undefined) {
@@ -448,12 +468,18 @@ export function App() {
     const listed = new Set(lists.forTrade);
     return cards.filter((card) => isDuplicate(card, owned) && !listed.has(cardKey(card)));
   }, [page, ownedReady, owned, cards, lists.forTrade]);
+  const needsPublicProfile = Boolean(
+    user &&
+      owned.status !== "ready" &&
+      (owned.status === "hidden" || !user.profile || user.profile.publicCollection === false),
+  );
+  const publicProfileMessage = "Make your KCC profile public if you want your collection to sync.";
   const tradeUnavailableReason = !user
     ? null
     : owned.status === "loading" || owned.status === "idle"
       ? "Loading your KCC collection…"
-      : owned.status === "hidden"
-        ? "Make your KCC collection public to list cards for trade."
+      : needsPublicProfile
+        ? publicProfileMessage
         : owned.status === "unavailable"
           ? "Couldn't read your KCC collection, so cards can't be listed for trade."
           : null;
@@ -471,8 +497,8 @@ export function App() {
   const wishKeys = new Set(lists.wishlist);
   const ownedProblem = ownedSyncFailed
     ? "Couldn't sync your KCC collection. Try again in a moment."
-    : owned.status === "hidden"
-      ? "Your KCC collection is private. Make it public on KCC, then sync again."
+    : needsPublicProfile
+      ? null
       : owned.status === "unavailable"
         ? "Couldn't read your KCC collection, so the Owned filter is off."
         : null;
@@ -482,7 +508,11 @@ export function App() {
       ? "Loading your collection…"
       : [
           owned.fetchedAt ? `Synced ${formatSyncedAt(owned.fetchedAt)}.` : null,
-          syncCoolingDown && owned.nextSyncAt ? `Next sync at ${formatTime(owned.nextSyncAt)}.` : "Sync from KCC now.",
+          syncCoolingDown && owned.nextSyncAt
+            ? `Next sync at ${formatTime(owned.nextSyncAt)}.`
+            : needsPublicProfile
+              ? publicProfileMessage
+              : "Sync from KCC now.",
         ]
           .filter(Boolean)
           .join(" ");
@@ -493,7 +523,7 @@ export function App() {
         syncHint,
         syncing: owned.syncing,
         syncDisabled: owned.syncing || owned.status === "loading" || syncCoolingDown,
-        onSync: syncOwned,
+        onSync: () => void syncOwned(),
       }
     : null;
   const counts: Record<Page, number | null> = {
@@ -536,7 +566,7 @@ export function App() {
               listDuplicates={user ? lists.listDuplicates === true : null}
               onListDuplicatesChange={(listDuplicates) => void savePreference({ listDuplicates })}
             />
-            {userLoaded ? <AccountMenu user={user} onOpen={openPage} /> : null}
+            {userLoaded ? <AccountMenu user={user} privateProfile={needsPublicProfile} onOpen={openPage} /> : null}
           </div>
         </div>
         <div className="hidden px-4 pb-3 sm:block lg:hidden">
@@ -563,6 +593,24 @@ export function App() {
             {notice}
           </Banner>
         ) : null}
+        {needsPublicProfile && !welcomeOpen ? (
+          <Banner tone="info">
+            {publicProfileMessage}{" "}
+            <button
+              type="button"
+              onClick={() => setWelcomeOpen(true)}
+              className="font-semibold underline decoration-sky-100/50 underline-offset-2 outline-none hover:decoration-sky-100 focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              Show me how
+            </button>
+          </Banner>
+        ) : null}
+        <WelcomeDialog
+          open={welcomeOpen}
+          onDismiss={dismissWelcome}
+          onConfirm={confirmProfilePublic}
+          profileHref={`https://koi-card-collector.com/profile/${user?.id ?? ""}`}
+        />
 
         {page === "profile" && profileId ? (
           <ProfilePage

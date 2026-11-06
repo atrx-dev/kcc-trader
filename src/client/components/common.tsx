@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Check, Info, Link2, X, type LucideIcon } from "lucide-react";
+import { Dialog } from "radix-ui";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -63,6 +64,56 @@ export function Banner({
         </button>
       ) : null}
     </div>
+  );
+}
+
+export function WelcomeDialog({
+  open,
+  onDismiss,
+  onConfirm,
+  profileHref,
+}: {
+  open: boolean;
+  onDismiss: () => void;
+  onConfirm: () => void;
+  profileHref: string;
+}) {
+  const [awaitingChange, setAwaitingChange] = useState(false);
+  useEffect(() => {
+    if (!open) setAwaitingChange(false);
+  }, [open]);
+
+  return (
+    <Dialog.Root open={open} onOpenChange={(next) => { if (!next) onDismiss(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
+        <Dialog.Content className="fixed top-1/2 left-1/2 z-50 w-[min(24rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/10 bg-[#1a1528] p-6 text-white shadow-lg outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+          <Dialog.Title className="font-display text-xl font-bold">Make your KCC profile public</Dialog.Title>
+          <Dialog.Description className="mt-2 text-sm text-white/70">
+            KCC Trader can't read a private profile. Open your profile, choose Edit profile, and turn on “<strong className="font-bold text-white">Show my collection to other players</strong>”.
+          </Dialog.Description>
+          <div className="mt-5 flex flex-wrap justify-end gap-2">
+            <Dialog.Close asChild>
+              <Button variant="ghost" className="rounded-full">Not now</Button>
+            </Dialog.Close>
+            {awaitingChange ? (
+              <Button className="rounded-full" onClick={onConfirm}>I've made it public</Button>
+            ) : (
+              <Button asChild className="rounded-full">
+                <a
+                  href={profileHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => setAwaitingChange(true)}
+                >
+                  Open your KCC profile
+                </a>
+              </Button>
+            )}
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 

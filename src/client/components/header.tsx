@@ -107,7 +107,15 @@ export function NavTabs({
   );
 }
 
-export function AccountMenu({ user, onOpen }: { user: SessionUser | null; onOpen: (page: Page, href: string) => void }) {
+export function AccountMenu({
+  user,
+  privateProfile,
+  onOpen,
+}: {
+  user: SessionUser | null;
+  privateProfile: boolean;
+  onOpen: (page: Page, href: string) => void;
+}) {
   if (!user) {
     return (
       <Button asChild className="h-9 rounded-full bg-[#5865f2] px-4 text-white hover:bg-[#4752c4]">
@@ -137,7 +145,11 @@ export function AccountMenu({ user, onOpen }: { user: SessionUser | null; onOpen
             <div className="hidden text-right leading-tight whitespace-nowrap sm:block">
               <p className="text-sm font-semibold group-hover:text-amber-100">{label}</p>
               <p className="text-xs text-white/55">
-                {user.profile ? `Level ${user.profile.level}` : "No public KCC profile"}
+                {user.profile
+                  ? privateProfile
+                    ? "Private KCC profile"
+                    : `Level ${user.profile.level}`
+                  : "No public KCC profile"}
               </p>
             </div>
             <Avatar className="size-9 ring-2 ring-amber-200/50 ring-offset-2 ring-offset-[#151223] transition group-hover:ring-amber-200">

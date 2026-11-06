@@ -179,13 +179,13 @@ export function isSpare(duplicates: Record<string, number> | undefined, key: str
   return owned !== null && (duplicates?.[owned] ?? 0) > 1;
 }
 
-export async function readOwned(env: OwnedEnv, profileId: string, refresh: boolean): Promise<OwnedResponse> {
+export async function readOwned(env: OwnedEnv, profileId: string, refresh: boolean, force = false): Promise<OwnedResponse> {
   const cacheKey = `owned:${profileId}`;
   const cached = await env.CARDS.get<OwnedCards>(cacheKey, "json");
   if (cached && Array.isArray(cached.ss)) {
     const response = withNextSync(cached);
     if (!refresh) return { ...response, artwork: [] };
-    if (Date.parse(response.nextSyncAt) > Date.now()) throw new SyncCooldownError(response.nextSyncAt);
+    if (!force && Date.parse(response.nextSyncAt) > Date.now()) throw new SyncCooldownError(response.nextSyncAt);
   }
   const { owned, artwork } = await fetchOwned(profileId);
   await env.CARDS.put(cacheKey, JSON.stringify(owned));

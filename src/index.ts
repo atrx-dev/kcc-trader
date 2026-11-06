@@ -2,6 +2,7 @@ import { beginDiscordLogin, finishDiscordLogin, logout, readSession, type AuthEn
 import {
   changeLists,
   parseChanges,
+  markIntroduced,
   readLists,
   readPublicLists,
   setPreferences,
@@ -91,7 +92,8 @@ export default {
       if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
       if (!user.profile) return Response.json({ error: "No public KCC profile" }, { status: 404 });
       try {
-        const owned = await readOwned(env, user.profile.id, request.method === "POST");
+        const force = request.method === "POST" && url.searchParams.get("force") === "1";
+        const owned = await readOwned(env, user.profile.id, request.method === "POST", force);
         const artworkAdded = await addSsArtwork(env, owned.artwork);
         const characterIds = [...owned.ss, ...owned.sss].map((key) => key.split(":")[0]);
         const catalogChanged = artworkAdded || (await discoverHiddenCards(env, characterIds).catch(() => false));
@@ -131,8 +133,10 @@ export default {
         if (typeof value !== "boolean") return Response.json({ error: "Invalid preferences" }, { status: 400 });
         preferences[name] = value;
       }
+      if (body?.introduced === true) await markIntroduced(env, user.id);
       if (Object.keys(preferences).length === 0) {
-        return Response.json({ error: "Invalid preferences" }, { status: 400 });
+        if (body?.introduced !== true) return Response.json({ error: "Invalid preferences" }, { status: 400 });
+        return Response.json(await readLists(env, traderFor(user)));
       }
       const saved = await setPreferences(env, traderFor(user), preferences);
       if (!(preferences.pruneWishlist || preferences.listDuplicates) || !user.profile) return Response.json(saved);
