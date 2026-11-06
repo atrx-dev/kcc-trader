@@ -53,7 +53,11 @@ export function VirtualGrid<T>({
     };
     apply();
     const observer = new ResizeObserver(apply);
-    observer.observe(node);
+    let observed: Element | null = node;
+    while (observed) {
+      observer.observe(observed);
+      observed = observed.parentElement;
+    }
     window.addEventListener("resize", apply);
     return () => {
       observer.disconnect();
@@ -63,7 +67,7 @@ export function VirtualGrid<T>({
 
   useLayoutEffect(() => {
     virtualizer.measure();
-  }, [virtualizer, columns, width, actionsHeight, items.length, rowHeight]);
+  }, [virtualizer, columns, width, actionsHeight, items.length, rowHeight, scrollMargin]);
 
   const rows = virtualizer.getVirtualItems();
   const scrolling = virtualizer.isScrolling;
