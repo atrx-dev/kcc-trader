@@ -244,6 +244,7 @@ export function FilterBar({
   query,
   onClearQuery,
   noun = "cards",
+  showCount = true,
 }: {
   options: Record<FacetId, string[]>;
   counts: Record<FacetId, Map<string, number>>;
@@ -256,6 +257,7 @@ export function FilterBar({
   query?: string;
   onClearQuery?: () => void;
   noun?: string;
+  showCount?: boolean;
 }) {
   const search = query?.trim() ?? "";
   const ownedActive = Boolean(ownedControls?.ready) && filters.owned !== "all";
@@ -324,17 +326,20 @@ export function FilterBar({
         ) : null}
       </div>
       {ownedControls?.problem ? <p className="px-3 text-xs text-white/55">{ownedControls.problem}</p> : null}
+      {!showCount && !active ? null : (
       <div className="flex min-h-7 flex-wrap items-center gap-2 px-1 text-sm">
-        <p className="mr-1 text-white/65">
-          {shown === null ? (
-            "Loading cards…"
-          ) : (
-            <>
-              <span className="font-semibold text-white tabular-nums">{shown.toLocaleString()}</span>
-              {active ? ` of ${total.toLocaleString()}` : ""} {noun}
-            </>
-          )}
-        </p>
+        {showCount ? (
+          <p className="mr-1 text-white/65">
+            {shown === null ? (
+              "Loading cards…"
+            ) : (
+              <>
+                <span className="font-semibold text-white tabular-nums">{shown.toLocaleString()}</span>
+                {active ? ` of ${total.toLocaleString()}` : ""} {noun}
+              </>
+            )}
+          </p>
+        ) : null}
         {search && onClearQuery ? <FilterChip prefix="Search" label={`“${search}”`} onRemove={onClearQuery} /> : null}
         {ownedActive ? (
           <FilterChip
@@ -359,6 +364,7 @@ export function FilterBar({
           </Button>
         ) : null}
       </div>
+      )}
     </section>
   );
 }

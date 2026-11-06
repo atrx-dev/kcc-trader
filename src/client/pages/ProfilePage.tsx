@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeftRight, ExternalLink, Heart, SearchX, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, ChevronDown, ExternalLink, Heart, SearchX, type LucideIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,16 +9,19 @@ import { type SessionUser, type Lists, type Trader, INACTIVE_AFTER_DAYS, daysSin
 import { VirtualGrid } from "../VirtualGrid.tsx";
 import { CardFace } from "../components/cards.tsx";
 import { type OwnedControls, FilterBar } from "../components/controls.tsx";
-import { EmptyState, GridSkeleton, SectionHeading, ShareListsButton } from "../components/common.tsx";
+import { EmptyState, GridSkeleton, ShareListsButton } from "../components/common.tsx";
 
 export interface PublicLists extends Lists {
   trader: Trader;
 }
 
 export function ProfileSection({
+  id,
   title,
   icon: Icon,
   tone,
+  open,
+  onToggle,
   cards,
   highlight,
   highlightLabel,
@@ -26,9 +29,12 @@ export function ProfileSection({
   empty,
   owned,
 }: {
+  id: string;
   title: string;
   icon: LucideIcon;
   tone: string;
+  open: boolean;
+  onToggle: () => void;
   cards: Card[];
   highlight: Set<string>;
   highlightLabel: string;
@@ -36,18 +42,25 @@ export function ProfileSection({
   empty: string;
   owned: OwnedState;
 }) {
+  const count = `${cards.length.toLocaleString()} ${cards.length === 1 ? "card" : "cards"}`;
   return (
-    <section className="grid gap-4">
-      <SectionHeading
-        title={title}
-        meta={
-          <span className="inline-flex items-center gap-1.5">
-            <Icon className={cn("size-4", tone)} />
-            {cards.length.toLocaleString()} {cards.length === 1 ? "card" : "cards"}
-          </span>
-        }
-      />
-      {cards.length === 0 ? (
+    <section id={id} className="scroll-mt-32 grid gap-4 sm:scroll-mt-[11.5rem] lg:scroll-mt-32">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={onToggle}
+          className="flex min-w-0 items-center gap-2 rounded-lg text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <ChevronDown className={cn("size-5 shrink-0 text-white/50 transition-transform", !open && "-rotate-90")} />
+          <h2 className="font-display text-2xl font-bold tracking-tight">{title}</h2>
+        </button>
+        <p className="inline-flex items-center gap-1.5 text-sm text-white/55">
+          <Icon className={cn("size-4", tone)} />
+          {count}
+        </p>
+      </div>
+      {!open ? null : cards.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-white/12 px-4 py-6 text-center text-sm text-white/50">{empty}</p>
       ) : (
         <VirtualGrid
@@ -104,6 +117,7 @@ export function ProfilePage({
     status: "loading",
     lists: null,
   });
+  const [openSections, setOpenSections] = useState({ "for-trade": true, wishlist: true });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -164,6 +178,13 @@ export function ProfilePage({
   const view = applyFilters(combined, filters, owned, "");
   const passing = new Set(view.cards);
   const filtering = filtersAreActive(filters, owned);
+  const forTradeCards = forTrade.filter((card) => passing.has(card));
+  const wishlistCards = wishlist.filter((card) => passing.has(card));
+
+  function showSection(id: "for-trade" | "wishlist") {
+    setOpenSections((current) => ({ ...current, [id]: true }));
+    window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
 
   return (
     <>
@@ -217,29 +238,63 @@ export function ProfilePage({
           shown={view.cards.length}
           total={combined.length}
           noun={combined.length === 1 ? "card" : "cards"}
+          showCount={false}
         />
       ) : null}
-      <ProfileSection
-        title="For trade"
-        icon={ArrowLeftRight}
-        tone="text-sky-300"
-        cards={forTrade.filter((card) => passing.has(card))}
-        highlight={own ? new Set() : myWishlist}
-        highlightLabel="On your wishlist"
-        empty={filtering && forTrade.length > 0 ? "No cards for trade match your filters." : "Nothing listed for trade."}
-        owned={owned}
-      />
-      <ProfileSection
-        title="Wishlist"
-        icon={Heart}
-        tone="text-rose-300"
-        cards={wishlist.filter((card) => passing.has(card))}
-        highlight={own ? new Set() : myForTrade}
-        highlightLabel="You have this for trade"
-        priority={priority}
-        empty={filtering && wishlist.length > 0 ? "No wishlist cards match your filters." : "Nothing on the wishlist."}
-        owned={owned}
-      />
+      <div>
+        <nav
+          aria-label="Profile lists"
+          className="sticky top-[4.375rem] z-30 mb-4 flex gap-1 rounded-full border border-white/10 bg-[#151223] p-1 sm:top-[7.875rem] lg:top-[4.375rem]"
+        >
+          <button
+            type="button"
+            onClick={() => showSection("for-trade")}
+            className="flex h-9 min-w-0 flex-1 items-center justify-center gap-2 rounded-full text-sm font-semibold text-sky-200 outline-none hover:bg-white/[0.06] focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <ArrowLeftRight className="size-4 shrink-0" />
+            <span className="truncate">For trade</span>
+            <span className="tabular-nums text-white/45">{forTradeCards.length}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => showSection("wishlist")}
+            className="flex h-9 min-w-0 flex-1 items-center justify-center gap-2 rounded-full text-sm font-semibold text-rose-200 outline-none hover:bg-white/[0.06] focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <Heart className="size-4 shrink-0" />
+            <span className="truncate">Wishlist</span>
+            <span className="tabular-nums text-white/45">{wishlistCards.length}</span>
+          </button>
+        </nav>
+        <div className="grid gap-6">
+          <ProfileSection
+            id="for-trade"
+            title="For trade"
+            icon={ArrowLeftRight}
+            tone="text-sky-300"
+            open={openSections["for-trade"]}
+            onToggle={() => setOpenSections((current) => ({ ...current, "for-trade": !current["for-trade"] }))}
+            cards={forTradeCards}
+            highlight={own ? new Set() : myWishlist}
+            highlightLabel="On your wishlist"
+            empty={filtering && forTrade.length > 0 ? "No cards for trade match your filters." : "Nothing listed for trade."}
+            owned={owned}
+          />
+          <ProfileSection
+            id="wishlist"
+            title="Wishlist"
+            icon={Heart}
+            tone="text-rose-300"
+            open={openSections.wishlist}
+            onToggle={() => setOpenSections((current) => ({ ...current, wishlist: !current.wishlist }))}
+            cards={wishlistCards}
+            highlight={own ? new Set() : myForTrade}
+            highlightLabel="You have this for trade"
+            priority={priority}
+            empty={filtering && wishlist.length > 0 ? "No wishlist cards match your filters." : "Nothing on the wishlist."}
+            owned={owned}
+          />
+        </div>
+      </div>
     </>
   );
 }

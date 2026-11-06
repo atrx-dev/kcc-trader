@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 44 640 238" fill="none">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="640" y2="320" gradientUnits="userSpaceOnUse">
       <stop stop-color="#2a2148"/>
-      <stop offset="1" stop-color="#171326"/>
+      <stop offset="1" stop-color="#221b3c"/>
     </linearGradient>
     <linearGradient id="art" x1="250" y1="70" x2="400" y2="210" gradientUnits="userSpaceOnUse">
       <stop stop-color="#f7c6de"/>
