@@ -22,6 +22,7 @@ export function SettingsSheet({
   onPruneWishlistChange,
   listDuplicates,
   onListDuplicatesChange,
+  onShowFeatures,
 }: {
   settings: Settings;
   onChange: (settings: Settings) => void;
@@ -36,6 +37,7 @@ export function SettingsSheet({
   onPruneWishlistChange: (pruneWishlist: boolean) => void;
   listDuplicates: boolean | null;
   onListDuplicatesChange: (listDuplicates: boolean) => void;
+  onShowFeatures: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const visibleRarities = rarities.filter((rarity) => !settings.hiddenRarities.includes(rarity));
@@ -186,6 +188,18 @@ export function SettingsSheet({
                   <p className="text-sm text-white/60">
                     When you open the site, show features added since you were last here.
                   </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 w-fit rounded-full"
+                    onClick={() => {
+                      setOpen(false);
+                      onShowFeatures();
+                    }}
+                  >
+                    Show what's new
+                  </Button>
                 </div>
                 <Switch
                   labelledBy="feature-notes-label"

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { cardKey, type Card } from "../../types.ts";
-import { type SessionUser, type Lists, type Trader, INACTIVE_AFTER_DAYS, daysSince, lastSeenLabel, type OwnedState, type Filters, kccTradeUrl, cardsInCatalogOrder, duplicateCount, facetOptionsFor, filtersAreActive, applyFilters } from "../model.ts";
+import { type SessionUser, type Lists, type Trader, INACTIVE_AFTER_DAYS, daysSince, lastSeenLabel, type OwnedState, type Filters, kccTradeUrl, cardsInCatalogOrder, priorityFirst, duplicateCount, facetOptionsFor, filtersAreActive, applyFilters } from "../model.ts";
 import { VirtualGrid } from "../VirtualGrid.tsx";
 import { CardFace } from "../components/cards.tsx";
 import { type OwnedControls, FilterBar } from "../components/controls.tsx";
@@ -22,6 +22,7 @@ export function ProfileSection({
   cards,
   highlight,
   highlightLabel,
+  priority,
   empty,
   owned,
 }: {
@@ -31,6 +32,7 @@ export function ProfileSection({
   cards: Card[];
   highlight: Set<string>;
   highlightLabel: string;
+  priority?: Set<string>;
   empty: string;
   owned: OwnedState;
 }) {
@@ -56,7 +58,7 @@ export function ProfileSection({
             const key = cardKey(card);
             return (
               <>
-                <CardFace card={card} copies={duplicateCount(card, owned)} />
+                <CardFace card={card} copies={duplicateCount(card, owned)} priority={priority?.has(key)} />
                 {highlight.has(key) ? (
                   <span className="self-center rounded-full bg-emerald-300/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-200">
                     {highlightLabel}
@@ -78,6 +80,7 @@ export function ProfilePage({
   catalogLoaded,
   myWishlist,
   myForTrade,
+  myPriority,
   filters,
   onFiltersChange,
   owned,
@@ -91,6 +94,7 @@ export function ProfilePage({
   catalogLoaded: boolean;
   myWishlist: Set<string>;
   myForTrade: Set<string>;
+  myPriority: Set<string>;
   filters: Filters;
   onFiltersChange: (filters: Filters) => void;
   owned: OwnedState;
@@ -154,7 +158,8 @@ export function ProfilePage({
   const lastSeen = own ? null : lastSeenLabel(trader.lastSeenAt);
   const inactive = !own && trader.lastSeenAt != null && daysSince(trader.lastSeenAt) >= INACTIVE_AFTER_DAYS;
   const forTrade = cardsInCatalogOrder(state.lists.forTrade, byKey);
-  const wishlist = cardsInCatalogOrder(state.lists.wishlist, byKey);
+  const priority = own ? myPriority : new Set(state.lists.priority ?? []);
+  const wishlist = priorityFirst(cardsInCatalogOrder(state.lists.wishlist, byKey), priority);
   const combined = [...new Set([...forTrade, ...wishlist])];
   const view = applyFilters(combined, filters, owned, "");
   const passing = new Set(view.cards);
@@ -231,6 +236,7 @@ export function ProfilePage({
         cards={wishlist.filter((card) => passing.has(card))}
         highlight={own ? new Set() : myForTrade}
         highlightLabel="You have this for trade"
+        priority={priority}
         empty={filtering && wishlist.length > 0 ? "No wishlist cards match your filters." : "Nothing on the wishlist."}
         owned={owned}
       />

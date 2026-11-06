@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { Check, Copy, Info, LogIn, Plus, RotateCcw, SearchX, X } from "lucide-react";
+import { Check, Copy, Info, LogIn, Plus, RotateCcw, SearchX, Star, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -7,7 +7,7 @@ import { cardKey, type Card } from "../../types.ts";
 import { VirtualGrid } from "../VirtualGrid.tsx";
 import { type SessionUser, type ListName, type OwnedState, LIST_COPY, ACTIONS_HEIGHT, duplicateCount } from "../model.ts";
 import { CardFace } from "../components/cards.tsx";
-import { SearchField } from "../components/controls.tsx";
+import { SearchField, ToggleAction } from "../components/controls.tsx";
 import { EmptyState, SectionHeading, ShareListsButton } from "../components/common.tsx";
 
 export function ListPage({
@@ -27,6 +27,8 @@ export function ListPage({
   query,
   onQuery,
   onToggle,
+  priority,
+  onPriority,
   unlistedDuplicates,
   owned,
 }: {
@@ -46,6 +48,8 @@ export function ListPage({
   query: string;
   onQuery: (value: string) => void;
   onToggle: (list: ListName, key: string, present: boolean, auto?: boolean) => void;
+  priority: Set<string>;
+  onPriority: (key: string, priority: boolean) => void;
   unlistedDuplicates: Card[];
   owned: OwnedState;
 }) {
@@ -201,19 +205,45 @@ export function ListPage({
               items={visible}
               actionsHeight={ACTIONS_HEIGHT}
               getKey={cardKey}
-              renderItem={(card) => (
-                <>
-                  <CardFace card={card} copies={duplicateCount(card, owned)} />
-                  <Button
-                    variant="ghost"
-                    className="h-[34px] rounded-full bg-white/[0.06] text-white/75 hover:bg-white/[0.11]"
-                    onClick={() => onToggle(list, cardKey(card), false)}
-                  >
-                    <X />
-                    Remove
-                  </Button>
-                </>
-              )}
+              renderItem={(card) => {
+                const key = cardKey(card);
+                const starred = list === "wishlist" && priority.has(key);
+                return (
+                  <>
+                    <CardFace card={card} copies={duplicateCount(card, owned)} priority={starred} />
+                    {list === "wishlist" ? (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <ToggleAction
+                          active={starred}
+                          icon={Star}
+                          label="Priority"
+                          activeClass="bg-[#f3d58f] text-[#1b1509] hover:bg-[#ffe7a8]"
+                          addLabel="Mark as priority"
+                          removeLabel="Remove priority"
+                          onClick={() => onPriority(key, !starred)}
+                        />
+                        <Button
+                          variant="ghost"
+                          className="h-[34px] rounded-full bg-white/[0.06] text-white/75 hover:bg-white/[0.11]"
+                          onClick={() => onToggle(list, key, false)}
+                        >
+                          <X />
+                          Remove
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        className="h-[34px] rounded-full bg-white/[0.06] text-white/75 hover:bg-white/[0.11]"
+                        onClick={() => onToggle(list, key, false)}
+                      >
+                        <X />
+                        Remove
+                      </Button>
+                    )}
+                  </>
+                );
+              }}
             />
           )}
         </>

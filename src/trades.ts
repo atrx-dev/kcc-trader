@@ -4,17 +4,20 @@ export interface TradeMatch {
   trader: Trader;
   theyHave: string[];
   theyWant: string[];
+  priority: string[];
 }
 
 interface MatchRow extends TraderRow {
   list: ListName;
   card_key: string;
+  wanted_priority: number;
 }
 
 export const INACTIVE_AFTER = 30 * 24 * 60 * 60 * 1000;
 
 const MATCH_QUERY = `
-  SELECT ${TRADER_COLUMNS}, theirs.list, theirs.card_key
+  SELECT ${TRADER_COLUMNS}, theirs.list, theirs.card_key,
+    CASE WHEN mine.list = 'wishlist' THEN mine.priority ELSE theirs.priority END AS wanted_priority
   FROM list_entries AS mine
   JOIN list_entries AS theirs
     ON theirs.card_key = mine.card_key
@@ -29,19 +32,25 @@ export async function findTrades(env: ListEnv, userId: string): Promise<TradeMat
   for (const row of results) {
     let match = byTrader.get(row.id);
     if (!match) {
-      match = { trader: traderFromRow(row), theyHave: [], theyWant: [] };
+      match = { trader: traderFromRow(row), theyHave: [], theyWant: [], priority: [] };
       byTrader.set(row.id, match);
     }
     if (row.list === "forTrade") match.theyHave.push(row.card_key);
     else match.theyWant.push(row.card_key);
+    if (row.wanted_priority) match.priority.push(row.card_key);
   }
 
   const score = (match: TradeMatch) => Math.min(match.theyHave.length, match.theyWant.length);
+  const priorityHits = (match: TradeMatch) => {
+    const wanted = new Set(match.priority);
+    return match.theyHave.reduce((count, key) => count + (wanted.has(key) ? 1 : 0), 0);
+  };
   return [...byTrader.values()]
     .filter((match) => match.theyHave.length > 0 && match.theyWant.length > 0)
     .sort(
       (a, b) =>
         score(b) - score(a) ||
+        priorityHits(b) - priorityHits(a) ||
         b.theyHave.length + b.theyWant.length - (a.theyHave.length + a.theyWant.length) ||
         a.trader.name.localeCompare(b.trader.name),
     );

@@ -67,7 +67,9 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
           <PageLink page="wishlist" href="/wishlist" onOpen={onOpen}>
             Wishlist
           </PageLink>{" "}
-          is cards you're hunting for. Other traders see both lists on your public page.
+          is cards you're hunting for. Other traders see both lists on your public page.{" "}
+          <strong className="font-semibold text-white">Priority</strong> marks the ones you want most. Star them in the
+          catalog or on your Wishlist. Those stay at the top, and the star shows on your page and in trades.
         </p>
         <p>
           <strong className="font-semibold text-white">List duplicates for trade</strong> is off until you turn it on
@@ -118,7 +120,7 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
           Card effects are the foil shine and sparkles. Turn them off in Settings if the page feels slow. Default
           catalog filters there are applied when you open the catalog without filters in the link. New features, also
           in Settings, shows a note the first time you open the site after something new is added. If more than one
-          piled up, you can step through them.
+          piled up, you can step through them. Show what's new opens those notes again.
         </p>
       </Article>
     </div>

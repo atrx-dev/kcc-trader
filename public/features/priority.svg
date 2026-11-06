@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a2148"/>
+      <stop offset="1" stop-color="#171326"/>
+    </linearGradient>
+    <linearGradient id="art" x1="250" y1="70" x2="400" y2="210" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f7c6de"/>
+      <stop offset="0.45" stop-color="#c9b6ff"/>
+      <stop offset="1" stop-color="#7f6ad4"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="320" fill="url(#bg)"/>
+  <rect x="268" y="78" width="148" height="186" rx="16" fill="#3a315c"/>
+  <rect x="224" y="62" width="156" height="196" rx="16" fill="#120e1c"/>
+  <rect x="234" y="72" width="136" height="128" rx="10" fill="url(#art)"/>
+  <rect x="246" y="214" width="92" height="8" rx="4" fill="#fff" fill-opacity="0.88"/>
+  <rect x="246" y="228" width="60" height="6" rx="3" fill="#fff" fill-opacity="0.45"/>
+  <g transform="translate(354 90)">
+    <circle r="16" fill="#f3d58f"/>
+    <path fill="#1b1509" d="M0-8.2 2.4-2.5 8.3-2.5 3.5 1 5.4 7 0 3.6-5.4 7-3.5 1-8.3-2.5-2.4-2.5z"/>
+  </g>
+</svg>

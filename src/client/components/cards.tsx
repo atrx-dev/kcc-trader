@@ -1,5 +1,6 @@
 import { type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { Copy } from "lucide-react";
+import { Copy, Star } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { type Card } from "../../types.ts";
 import { frameUrl, namePlateStyle } from "../frame.ts";
 
@@ -80,6 +81,38 @@ export function FoilCard({ card, children }: { card: Card; children: ReactNode }
   );
 }
 
+function PriorityMark() {
+  return (
+    <span
+      className="priority-mark pointer-events-none absolute top-3 right-3 z-10 inline-flex items-center gap-1 rounded-full bg-[#f3d58f] px-1.5 py-1 text-[11px] leading-none font-bold text-[#1b1509] shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
+      aria-hidden="true"
+    >
+      <Star className="size-3 shrink-0 fill-current" />
+      <span className="priority-label">Priority</span>
+    </span>
+  );
+}
+
+function PriorityToggle({ active, onClick }: { active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      aria-label={active ? "Remove priority" : "Mark as priority"}
+      onClick={onClick}
+      className={cn(
+        "absolute top-3 right-3 z-10 inline-flex items-center justify-center rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.5)] outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        active
+          ? "gap-1 bg-[#f3d58f] px-1.5 py-1 text-[11px] leading-none font-bold text-[#1b1509]"
+          : "size-8 bg-black/55 text-white/85 hover:bg-black/70 hover:text-white",
+      )}
+    >
+      <Star className={cn(active ? "size-3 fill-current" : "size-4")} />
+      {active ? "Priority" : null}
+    </button>
+  );
+}
+
 function DuplicateMark({ count }: { count: number }) {
   return (
     <span
@@ -93,14 +126,24 @@ function DuplicateMark({ count }: { count: number }) {
   );
 }
 
-export function CardFace({ card, copies = 0 }: { card: Card; copies?: number }) {
+export function CardFace({
+  card,
+  copies = 0,
+  priority = false,
+  onPriority,
+}: {
+  card: Card;
+  copies?: number;
+  priority?: boolean;
+  onPriority?: () => void;
+}) {
   const holo = card.rank === "S" || card.rank === "SS" || card.rank === "SSS";
   const face = (
     <div
       className={holo ? "card framed-card foil" : "card framed-card"}
       data-rank={card.rank}
       data-sss-border={card.rank === "SSS" ? card.border || "starry" : undefined}
-      aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${copies > 1 ? `, ${copies} copies` : ""}`}
+      aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${priority ? ", priority" : ""}${copies > 1 ? `, ${copies} copies` : ""}`}
     >
       {card.image ? (
         <img className="card-artwork" src={card.image} alt="" decoding="async" />
@@ -118,6 +161,7 @@ export function CardFace({ card, copies = 0 }: { card: Card; copies?: number }) 
   return (
     <div className="card-stack">
       {holo ? <FoilCard card={card}>{face}</FoilCard> : face}
+      {onPriority ? <PriorityToggle active={priority} onClick={onPriority} /> : priority ? <PriorityMark /> : null}
       {copies > 1 ? <DuplicateMark count={copies} /> : null}
     </div>
   );

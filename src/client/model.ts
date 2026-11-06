@@ -22,6 +22,7 @@ export interface SessionUser {
 export interface Lists {
   forTrade: string[];
   wishlist: string[];
+  priority?: string[];
   accepting?: boolean;
   pruneWishlist?: boolean;
   listDuplicates?: boolean;
@@ -41,16 +42,23 @@ export interface ListChange {
   key: string;
   present: boolean;
   auto?: boolean;
+  priority?: boolean;
 }
 
-export const NO_LISTS: Lists = { forTrade: [], wishlist: [] };
+export const NO_LISTS: Lists = { forTrade: [], wishlist: [], priority: [] };
 export const LIST_SAVE_DELAY = 1200;
 
 export function withChanges(base: Lists, changes: ListChange[]): Lists {
-  const next = { ...base };
-  for (const { list, key, present } of changes) {
-    const without = next[list].filter((item) => item !== key);
-    next[list] = present ? [key, ...without] : without;
+  const next: Lists = { ...base, priority: base.priority ? [...base.priority] : [] };
+  for (const { list, key, present, priority } of changes) {
+    const already = next[list].includes(key);
+    if (!(present && priority !== undefined && already)) {
+      const without = next[list].filter((item) => item !== key);
+      next[list] = present ? [key, ...without] : without;
+    }
+    if (list !== "wishlist") continue;
+    if (!present || priority === false) next.priority = next.priority!.filter((item) => item !== key);
+    else if (priority === true && !next.priority!.includes(key)) next.priority = [key, ...next.priority!];
   }
   return next;
 }
@@ -85,6 +93,7 @@ export interface TradeMatch {
   trader: Trader;
   theyHave: string[];
   theyWant: string[];
+  priority?: string[];
 }
 
 export interface TradesState {
@@ -263,6 +272,14 @@ export function cardsInCatalogOrder(keys: Iterable<string>, byKey: Map<string, C
   return [...byKey.values()].filter((card) => wanted.has(cardKey(card)));
 }
 
+export function priorityFirst(cards: Card[], priority: ReadonlySet<string>): Card[] {
+  if (priority.size === 0) return cards;
+  const first: Card[] = [];
+  const rest: Card[] = [];
+  for (const card of cards) (priority.has(cardKey(card)) ? first : rest).push(card);
+  return [...first, ...rest];
+}
+
 export function duplicateCount(card: Card, owned: OwnedState): number {
   const count =
     card.rank === "SSS"
@@ -306,7 +323,7 @@ export const LIST_COPY: Record<
   },
   wishlist: {
     title: "Wishlist",
-    blurb: "Cards you're hunting for.",
+    blurb: "Cards you're hunting for. Star the ones you want most.",
     empty: "Search above, or tap Wishlist on any card in the catalog.",
     icon: Heart,
     bubble: "bg-rose-300/15 text-rose-300",

@@ -9,15 +9,10 @@ export const SEEN_FEATURE_KEY = "kcc-trader:seen-feature";
 
 export const FEATURES: FeatureNote[] = [
   {
-    id: "visit-sync",
-    title: "Your collection stays up to date",
-    body: "Opening the site refreshes your collection when the last sync was more than 12 hours ago. The sync button still waits an hour between tries.",
-  },
-  {
-    id: "help",
-    title: "Help",
-    body: "The question mark in the header opens a short guide to syncing, lists, and trades. There's a Help link in the footer too.",
-    image: "/features/help.svg",
+    id: "wishlist-priority",
+    title: "Priority wishes",
+    body: "Star a card in the catalog, or on your Wishlist, when you want it most. Priority wishes stay at the top, and the star shows on your page.",
+    image: "/features/priority.svg",
   },
 ];
 

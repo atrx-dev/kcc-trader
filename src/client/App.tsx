@@ -3,7 +3,7 @@ import { RotateCcw, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cardKey, type Card, type Catalog } from "../types.ts";
 import { VirtualGrid } from "./VirtualGrid.tsx";
-import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters } from "./model.ts";
+import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters } from "./model.ts";
 import { CardFace } from "./components/cards.tsx";
 import { formatSyncedAt, Brand, NavTabs, AccountMenu, HelpButton } from "./components/header.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
@@ -14,7 +14,7 @@ import { TradesPage } from "./pages/TradesPage.tsx";
 import { ListPage } from "./pages/ListPage.tsx";
 import { HelpPage } from "./pages/HelpPage.tsx";
 import { FeatureDialog } from "./components/FeatureDialog.tsx";
-import { SEEN_FEATURE_KEY, unseenFeatures } from "./features.ts";
+import { FEATURES, SEEN_FEATURE_KEY, unseenFeatures } from "./features.ts";
 
 const INITIAL_PAGE = pageFromPath(window.location.pathname);
 const INITIAL_URL_STATE = readUrlState(window.location.search);
@@ -44,6 +44,7 @@ export function App() {
   const [welcomeOpen, setWelcomeOpen] = useState(false);
   const [listsReady, setListsReady] = useState(false);
   const [featureNotes, setFeatureNotes] = useState(() => unseenFeatures(window.localStorage.getItem(SEEN_FEATURE_KEY)));
+  const [replayFeatures, setReplayFeatures] = useState(false);
   const [page, setPage] = useState<Page>(INITIAL_PAGE);
   const [profileId, setProfileId] = useState(() => profileIdFromPath(window.location.pathname));
   const [query, setQuery] = useState(INITIAL_URL_STATE.query);
@@ -270,9 +271,10 @@ export function App() {
   }
 
   function dismissFeatures() {
-    const latest = featureNotes.at(-1);
+    const latest = (replayFeatures ? FEATURES : featureNotes).at(-1);
     if (latest) window.localStorage.setItem(SEEN_FEATURE_KEY, latest.id);
     setFeatureNotes([]);
+    setReplayFeatures(false);
   }
 
   function disableFeatures() {
@@ -292,6 +294,7 @@ export function App() {
       ...saved,
       forTrade: [...added.filter((key) => !keptForTrade.includes(key)), ...keptForTrade],
       wishlist: saved.wishlist.filter((key) => !goneWishlist.has(key)),
+      priority: (saved.priority ?? []).filter((key) => !goneWishlist.has(key)),
     });
     setListsSaved((version) => version + 1);
 
@@ -315,19 +318,26 @@ export function App() {
     setNotice(sentences.join(" "));
   }
 
-  function toggle(list: ListName, key: string, present: boolean, auto = false) {
+  function queueChange(change: ListChange) {
     if (!user) {
       setListError("Sign in with Discord to edit your lists.");
       return;
     }
     setListError(null);
-    const change = { list, key, present, ...(auto ? { auto: true } : {}) };
     pendingChanges.current = [
-      ...pendingChanges.current.filter((item) => item.list !== list || item.key !== key),
+      ...pendingChanges.current.filter((item) => item.list !== change.list || item.key !== change.key),
       change,
     ];
     setLists((current) => withChanges(current, [change]));
     scheduleListSave();
+  }
+
+  function toggle(list: ListName, key: string, present: boolean, auto = false) {
+    queueChange({ list, key, present, ...(auto ? { auto: true } : {}) });
+  }
+
+  function setPriority(key: string, priority: boolean) {
+    queueChange({ list: "wishlist", key, present: true, priority });
   }
 
   function scheduleListSave() {
@@ -457,7 +467,11 @@ export function App() {
   const byKey = useMemo(() => new Map(cards.map((card) => [cardKey(card), card])), [cards]);
   const listName: ListName | null = page === "forTrade" || page === "wishlist" ? page : null;
   const selectedKeys = listName ? lists[listName] : [];
-  const selected = cardsInCatalogOrder(selectedKeys, byKey);
+  const priorityKeys = new Set(lists.priority ?? []);
+  const selected = priorityFirst(
+    cardsInCatalogOrder(selectedKeys, byKey),
+    listName === "wishlist" ? priorityKeys : new Set(),
+  );
   const needle = query.trim().toLowerCase();
   const catalogOptions = useMemo(() => facetOptionsFor(cards), [cards]);
   const heroStats = useMemo(() => {
@@ -560,9 +574,12 @@ export function App() {
   const tradeMatches = useMemo(
     () =>
       trades.matches.flatMap((match) => {
-        const theyHave = cardsInCatalogOrder(match.theyHave, byKey);
-        const theyWant = cardsInCatalogOrder(match.theyWant, byKey);
-        return theyHave.length > 0 && theyWant.length > 0 ? [{ trader: match.trader, theyHave, theyWant }] : [];
+        const priority = new Set(match.priority ?? []);
+        const theyHave = priorityFirst(cardsInCatalogOrder(match.theyHave, byKey), priority);
+        const theyWant = priorityFirst(cardsInCatalogOrder(match.theyWant, byKey), priority);
+        return theyHave.length > 0 && theyWant.length > 0
+          ? [{ trader: match.trader, theyHave, theyWant, priority }]
+          : [];
       }),
     [trades.matches, byKey],
   );
@@ -590,6 +607,7 @@ export function App() {
               onPruneWishlistChange={(pruneWishlist) => void savePreference({ pruneWishlist })}
               listDuplicates={user ? lists.listDuplicates === true : null}
               onListDuplicatesChange={(listDuplicates) => void savePreference({ listDuplicates })}
+              onShowFeatures={() => setReplayFeatures(true)}
             />
             {userLoaded ? <AccountMenu user={user} privateProfile={needsPublicProfile} onOpen={openPage} /> : null}
           </div>
@@ -637,8 +655,9 @@ export function App() {
           profileHref={`https://koi-card-collector.com/profile/${user?.id ?? ""}`}
         />
         <FeatureDialog
-          open={settings.featureNotes && listsReady && !welcomeOpen && featureNotes.length > 0}
-          notes={featureNotes}
+          key={replayFeatures ? "replay" : "auto"}
+          open={listsReady && !welcomeOpen && (replayFeatures || (settings.featureNotes && featureNotes.length > 0))}
+          notes={replayFeatures ? FEATURES : featureNotes}
           onDismiss={dismissFeatures}
           onDisable={disableFeatures}
         />
@@ -654,6 +673,7 @@ export function App() {
             catalogLoaded={catalog !== null}
             myWishlist={wishKeys}
             myForTrade={tradeKeys}
+            myPriority={priorityKeys}
             filters={pageFilters.profile}
             onFiltersChange={(next) => setFiltersFor("profile", next)}
             owned={owned}
@@ -702,6 +722,8 @@ export function App() {
             query={query}
             onQuery={setQuery}
             onToggle={toggle}
+            priority={priorityKeys}
+            onPriority={setPriority}
             unlistedDuplicates={unlistedDuplicates}
             owned={owned}
           />
@@ -775,7 +797,12 @@ export function App() {
                 const onTrade = tradeKeys.has(key);
                 return (
                   <>
-                    <CardFace card={card} copies={duplicateCount(card, owned)} />
+                    <CardFace
+                      card={card}
+                      copies={duplicateCount(card, owned)}
+                      priority={onWishlist && priorityKeys.has(key)}
+                      onPriority={() => setPriority(key, !(onWishlist && priorityKeys.has(key)))}
+                    />
                     <CatalogActions
                       onWishlist={onWishlist}
                       onTrade={onTrade}

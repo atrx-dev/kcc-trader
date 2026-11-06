@@ -1,0 +1,1 @@
+ALTER TABLE list_entries ADD COLUMN priority INTEGER NOT NULL DEFAULT 0;

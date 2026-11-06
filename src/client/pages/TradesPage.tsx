@@ -13,11 +13,24 @@ export interface ResolvedMatch {
   trader: Trader;
   theyHave: Card[];
   theyWant: Card[];
+  priority: Set<string>;
 }
 
 export const MATCH_PREVIEW = 8;
 
-export function MatchCards({ title, cards, tone, owned }: { title: string; cards: Card[]; tone: string; owned: OwnedState }) {
+export function MatchCards({
+  title,
+  cards,
+  tone,
+  owned,
+  priority,
+}: {
+  title: string;
+  cards: Card[];
+  tone: string;
+  owned: OwnedState;
+  priority: Set<string>;
+}) {
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? cards : cards.slice(0, MATCH_PREVIEW);
   return (
@@ -32,7 +45,7 @@ export function MatchCards({ title, cards, tone, owned }: { title: string; cards
       <div className="grid grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2">
         {shown.map((card) => (
           <div key={cardKey(card)} className="trade-thumb">
-            <CardFace card={card} copies={duplicateCount(card, owned)} />
+            <CardFace card={card} copies={duplicateCount(card, owned)} priority={priority.has(cardKey(card))} />
           </div>
         ))}
       </div>
@@ -59,7 +72,7 @@ export function TraderMatch({
   owned: OwnedState;
   onOpen: (page: Page, href: string) => void;
 }) {
-  const { trader, theyHave, theyWant } = match;
+  const { trader, theyHave, theyWant, priority } = match;
   const tradeUrl = kccTradeUrl(trader);
 
   return (
@@ -95,8 +108,8 @@ export function TraderMatch({
         </Button>
       </header>
       <div className="grid gap-3 md:grid-cols-2">
-        <MatchCards title="They have, you want" cards={theyHave} tone="bg-rose-300" owned={owned} />
-        <MatchCards title="You have, they want" cards={theyWant} tone="bg-sky-300" owned={owned} />
+        <MatchCards title="They have, you want" cards={theyHave} tone="bg-rose-300" owned={owned} priority={priority} />
+        <MatchCards title="You have, they want" cards={theyWant} tone="bg-sky-300" owned={owned} priority={priority} />
       </div>
     </article>
   );

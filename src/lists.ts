@@ -3,6 +3,7 @@ export type ListName = "forTrade" | "wishlist";
 export interface Lists {
   forTrade: string[];
   wishlist: string[];
+  priority?: string[];
 }
 
 export interface Trader {
@@ -20,6 +21,7 @@ export interface ListChange {
   key: string;
   present: boolean;
   auto?: boolean;
+  priority?: boolean;
 }
 
 export interface Preferences {
@@ -57,6 +59,7 @@ export interface TraderRow {
 interface EntryRow {
   list: ListName;
   card_key: string;
+  priority?: number;
 }
 
 const KEY_PATTERN = /^[0-9a-f-]{36}:(?:[0-9a-f-]{36})?:(?:Common|B|A|S|SS|SSS)$/i;
@@ -71,11 +74,18 @@ export function parseChanges(value: unknown): ListChange[] | null {
   const changes: ListChange[] = [];
   for (const item of value) {
     if (!item || typeof item !== "object") return null;
-    const { list, key, present, auto } = item as Record<string, unknown>;
+    const { list, key, present, auto, priority } = item as Record<string, unknown>;
     if (list !== "forTrade" && list !== "wishlist") return null;
     if (typeof key !== "string" || !KEY_PATTERN.test(key) || typeof present !== "boolean") return null;
     if (auto !== undefined && typeof auto !== "boolean") return null;
-    changes.push({ list, key, present, auto: auto === true });
+    if (priority !== undefined && (typeof priority !== "boolean" || list !== "wishlist")) return null;
+    changes.push({
+      list,
+      key,
+      present,
+      auto: auto === true,
+      ...(typeof priority === "boolean" ? { priority } : {}),
+    });
   }
   return changes;
 }
@@ -139,13 +149,16 @@ function selectTrader(env: ListEnv, id: string): D1PreparedStatement {
 
 function selectEntries(env: ListEnv, id: string): D1PreparedStatement {
   return env.DB.prepare(
-    "SELECT list, card_key FROM list_entries WHERE trader_id = ? ORDER BY added_at DESC",
+    "SELECT list, card_key, priority FROM list_entries WHERE trader_id = ? ORDER BY added_at DESC",
   ).bind(id);
 }
 
 function listsFrom(rows: EntryRow[]): Lists {
-  const lists: Lists = { forTrade: [], wishlist: [] };
-  for (const row of rows) lists[row.list].push(row.card_key);
+  const lists: Lists = { forTrade: [], wishlist: [], priority: [] };
+  for (const row of rows) {
+    lists[row.list].push(row.card_key);
+    if (row.list === "wishlist" && row.priority) lists.priority!.push(row.card_key);
+  }
   return lists;
 }
 
@@ -263,11 +276,22 @@ export async function changeLists(
   const writes: D1PreparedStatement[] = [saveTrader(env, trader)];
   let full = false;
 
-  changes.forEach(({ list, key, present, auto }, index) => {
+  changes.forEach(({ list, key, present, auto, priority }, index) => {
     if (!present) {
       members[list].delete(key);
       writes.push(
         env.DB.prepare("DELETE FROM list_entries WHERE trader_id = ? AND list = ? AND card_key = ?").bind(
+          trader.id,
+          list,
+          key,
+        ),
+      );
+      return;
+    }
+    if (members[list].has(key) && list === "wishlist" && priority !== undefined) {
+      writes.push(
+        env.DB.prepare("UPDATE list_entries SET priority = ? WHERE trader_id = ? AND list = ? AND card_key = ?").bind(
+          priority ? 1 : 0,
           trader.id,
           list,
           key,
@@ -282,9 +306,16 @@ export async function changeLists(
     members[list].add(key);
     writes.push(
       env.DB.prepare(
-        `INSERT INTO list_entries (trader_id, list, card_key, added_at, auto) VALUES (?, ?, ?, ?, ?)
+        `INSERT INTO list_entries (trader_id, list, card_key, added_at, auto, priority) VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT (trader_id, list, card_key) DO UPDATE SET added_at = excluded.added_at, auto = excluded.auto`,
-      ).bind(trader.id, list, key, now + index, list === "forTrade" && auto ? 1 : 0),
+      ).bind(
+        trader.id,
+        list,
+        key,
+        now + index,
+        list === "forTrade" && auto ? 1 : 0,
+        list === "wishlist" && priority ? 1 : 0,
+      ),
     );
   });
 
