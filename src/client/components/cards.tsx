@@ -2,7 +2,7 @@ import { type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Copy, Heart, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isNewCard, type Card } from "../../types.ts";
-import { frameUrl, namePlateStyle } from "../frame.ts";
+import { frameUrl, hasFrame, namePlateStyle } from "../frame.ts";
 
 export const SSS_STARS = [
   [9, 12], [82, 8], [24, 31], [69, 23], [94, 41], [14, 58],
@@ -158,11 +158,12 @@ export function CardFace({
 }) {
   const holo = card.rank === "S" || card.rank === "SS" || card.rank === "SSS";
   const fresh = isNewCard(card);
+  const framed = hasFrame(card);
   const face = (
     <div
       className={holo ? "card framed-card foil" : "card framed-card"}
       data-rank={card.rank}
-      data-sss-border={card.rank === "SSS" ? card.border || "starry" : undefined}
+      data-sss-border={card.rank === "SSS" && framed ? card.border || "starry" : undefined}
       aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${fresh ? ", new" : ""}${priority ? ", priority" : ""}${copies > 1 ? `, ${copies} copies` : ""}${wanted > 0 ? `, wishlisted by ${wanted}` : ""}`}
     >
       {card.image ? (
@@ -170,12 +171,14 @@ export function CardFace({
       ) : (
         <div className="art-fallback" />
       )}
-      <img className="card-border" src={frameUrl(card)} alt="" decoding="async" />
-      <footer style={namePlateStyle(card)}>
-        <strong title={card.variantName ? `${card.name} (${card.variantName})` : card.name}>{card.name}</strong>
-        <span title={card.game}>{card.game}</span>
-        {card.creator ? <span title={`by ${card.creator}`}>by {card.creator}</span> : null}
-      </footer>
+      {framed ? <img className="card-border" src={frameUrl(card)} alt="" decoding="async" /> : null}
+      {framed ? (
+        <footer style={namePlateStyle(card)}>
+          <strong title={card.variantName ? `${card.name} (${card.variantName})` : card.name}>{card.name}</strong>
+          <span title={card.game}>{card.game}</span>
+          {card.creator ? <span title={`by ${card.creator}`}>by {card.creator}</span> : null}
+        </footer>
+      ) : null}
     </div>
   );
   return (

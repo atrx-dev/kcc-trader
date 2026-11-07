@@ -1,5 +1,14 @@
 import type { Card } from "../types.ts";
 
+const BORDERLESS = new Set(["besties"]);
+
+export function hasFrame(card: Pick<Card, "name" | "variantName" | "eventName">): boolean {
+  for (const part of [card.name, card.variantName, card.eventName]) {
+    if (part && BORDERLESS.has(part.toLowerCase())) return false;
+  }
+  return true;
+}
+
 const RANK_FRAMES: Record<string, string> = {
   Common: "/frames/common.webp",
   B: "/frames/b.webp",
