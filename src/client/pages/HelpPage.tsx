@@ -119,7 +119,7 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
         <p>
           Card effects are the foil shine and sparkles. Turn them off in Settings if the page feels slow. Default
           catalog filters there are applied when you open the catalog without filters in the link. New features, also
-          in Settings, shows a note the first time you open the site after something new is added. If more than one
+          in Settings, shows a note the first time you open the site while signed in after something new is added. If more than one
           piled up, you can step through them. Show what's new opens those notes again.
         </p>
       </Article>

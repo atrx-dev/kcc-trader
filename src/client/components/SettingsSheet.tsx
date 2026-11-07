@@ -22,6 +22,7 @@ export function SettingsSheet({
   onPruneWishlistChange,
   listDuplicates,
   onListDuplicatesChange,
+  signedIn,
   onShowFeatures,
 }: {
   settings: Settings;
@@ -37,6 +38,7 @@ export function SettingsSheet({
   onPruneWishlistChange: (pruneWishlist: boolean) => void;
   listDuplicates: boolean | null;
   onListDuplicatesChange: (listDuplicates: boolean) => void;
+  signedIn: boolean;
   onShowFeatures: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -179,35 +181,37 @@ export function SettingsSheet({
                 />
               </div>
             </section>
-            <section className="flex flex-col gap-3">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h4 id="feature-notes-label" className="font-display text-base font-bold">
-                    New features
-                  </h4>
-                  <p className="text-sm text-white/60">
-                    When you open the site, show features added since you were last here.
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-2 w-fit rounded-full"
-                    onClick={() => {
-                      setOpen(false);
-                      onShowFeatures();
-                    }}
-                  >
-                    Show what's new
-                  </Button>
+            {signedIn ? (
+              <section className="flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h4 id="feature-notes-label" className="font-display text-base font-bold">
+                      New features
+                    </h4>
+                    <p className="text-sm text-white/60">
+                      When you open the site, show features added since you were last here.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 w-fit rounded-full"
+                      onClick={() => {
+                        setOpen(false);
+                        onShowFeatures();
+                      }}
+                    >
+                      Show what's new
+                    </Button>
+                  </div>
+                  <Switch
+                    labelledBy="feature-notes-label"
+                    checked={settings.featureNotes}
+                    onChange={(featureNotes) => onChange({ ...settings, featureNotes })}
+                  />
                 </div>
-                <Switch
-                  labelledBy="feature-notes-label"
-                  checked={settings.featureNotes}
-                  onChange={(featureNotes) => onChange({ ...settings, featureNotes })}
-                />
-              </div>
-            </section>
+              </section>
+            ) : null}
           </SettingsGroup>
 
           <SettingsGroup title="Browsing">

@@ -607,6 +607,7 @@ export function App() {
               onPruneWishlistChange={(pruneWishlist) => void savePreference({ pruneWishlist })}
               listDuplicates={user ? lists.listDuplicates === true : null}
               onListDuplicatesChange={(listDuplicates) => void savePreference({ listDuplicates })}
+              signedIn={user !== null}
               onShowFeatures={() => setReplayFeatures(true)}
             />
             {userLoaded ? <AccountMenu user={user} privateProfile={needsPublicProfile} onOpen={openPage} /> : null}
@@ -656,7 +657,12 @@ export function App() {
         />
         <FeatureDialog
           key={replayFeatures ? "replay" : "auto"}
-          open={listsReady && !welcomeOpen && (replayFeatures || (settings.featureNotes && featureNotes.length > 0))}
+          open={
+            Boolean(user) &&
+            listsReady &&
+            !welcomeOpen &&
+            (replayFeatures || (settings.featureNotes && featureNotes.length > 0))
+          }
           notes={replayFeatures ? FEATURES : featureNotes}
           onDismiss={dismissFeatures}
           onDisable={disableFeatures}
