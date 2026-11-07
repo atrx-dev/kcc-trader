@@ -5,6 +5,7 @@ import {
   markIntroduced,
   readLists,
   readPublicLists,
+  searchTraders,
   setPreferences,
   syncLists,
   type ListChange,
@@ -113,6 +114,11 @@ export default {
       const user = await readSession(request, env);
       if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
       return Response.json({ matches: await findTrades(env, user.id) });
+    }
+
+    if (url.pathname === "/api/traders" && request.method === "GET") {
+      const traders = await searchTraders(env, url.searchParams.get("q") ?? "");
+      return Response.json({ traders });
     }
 
     const traderPath = url.pathname.match(/^\/api\/traders\/(\d{5,25})$/);

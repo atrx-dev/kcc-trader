@@ -28,11 +28,21 @@ export const FEATURES: FeatureNote[] = [
     body: "Cards added in the last 7 days wear a New badge. Sort the catalog by Name, or by Newest, to bring them up front.",
     image: "/features/new-cards.svg",
   },
+  {
+    id: "find-trader",
+    title: "Find a trader",
+    body: "Search the header for a display name, Discord username, or KCC name, and open that person's page.",
+    image: "/features/find-trader.svg",
+  },
 ];
 
+function newestFirst(notes: readonly FeatureNote[]): FeatureNote[] {
+  return [...notes].reverse();
+}
+
 export function unseenFeatures(seenId: string | null): FeatureNote[] {
-  if (!seenId) return FEATURES;
+  if (!seenId) return newestFirst(FEATURES);
   const index = FEATURES.findIndex((feature) => feature.id === seenId);
-  if (index === -1) return FEATURES;
-  return FEATURES.slice(index + 1);
+  const unseen = index === -1 ? FEATURES : FEATURES.slice(index + 1);
+  return newestFirst(unseen);
 }

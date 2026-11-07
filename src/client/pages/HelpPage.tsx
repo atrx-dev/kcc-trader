@@ -101,7 +101,7 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
         </p>
         <p>
           Offer a trade on KCC opens that person's trade page there. Share lists, on your own page, copies a link to
-          your public lists.
+          your public lists. Find a trader, in the header, searches display names, Discord usernames, and KCC names.
         </p>
       </Article>
 
@@ -124,7 +124,7 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
           Card effects are the foil shine and sparkles. Turn them off in Settings if the page feels slow. Default
           catalog filters there are applied when you open the catalog without filters in the link. New features, also
           in Settings, shows a note the first time you open the site while signed in after something new is added. If more than one
-          piled up, you can step through them. Show what's new opens those notes again.
+          piled up, the newest one comes first and you can step through the rest. Show what's new opens those notes again.
         </p>
       </Article>
     </div>

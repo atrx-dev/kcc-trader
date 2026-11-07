@@ -90,6 +90,32 @@ export function parseChanges(value: unknown): ListChange[] | null {
   return changes;
 }
 
+const TRADER_SEARCH_LIMIT = 8;
+
+export async function searchTraders(env: ListEnv, raw: string): Promise<Trader[]> {
+  const query = raw.trim().slice(0, 40);
+  if (query.length < 2) return [];
+  const escaped = query.replace(/[\\%_]/g, (char) => `\\${char}`);
+  const rows = await env.DB.prepare(
+    `SELECT ${TRADER_COLUMNS} FROM traders
+     WHERE name LIKE ?1 ESCAPE '\\' COLLATE NOCASE
+        OR username LIKE ?1 ESCAPE '\\' COLLATE NOCASE
+        OR IFNULL(kcc_name, '') LIKE ?1 ESCAPE '\\' COLLATE NOCASE
+     ORDER BY
+       CASE
+         WHEN name LIKE ?2 ESCAPE '\\' COLLATE NOCASE
+           OR username LIKE ?2 ESCAPE '\\' COLLATE NOCASE
+           OR IFNULL(kcc_name, '') LIKE ?2 ESCAPE '\\' COLLATE NOCASE
+         THEN 0 ELSE 1
+       END,
+       name COLLATE NOCASE
+     LIMIT ${TRADER_SEARCH_LIMIT}`,
+  )
+    .bind(`%${escaped}%`, `${escaped}%`)
+    .all<TraderRow>();
+  return rows.results.map(traderFromRow);
+}
+
 export function traderFromRow(row: TraderRow): Trader {
   return {
     id: row.id,

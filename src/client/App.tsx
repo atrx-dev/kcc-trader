@@ -5,7 +5,7 @@ import { cardKey, type Card, type Catalog } from "../types.ts";
 import { VirtualGrid } from "./VirtualGrid.tsx";
 import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, byName, newestFirst, type CatalogSort, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters } from "./model.ts";
 import { CardFace } from "./components/cards.tsx";
-import { formatSyncedAt, Brand, NavTabs, AccountMenu, HelpButton } from "./components/header.tsx";
+import { formatSyncedAt, Brand, NavTabs, AccountMenu, HelpButton, TraderSearch } from "./components/header.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
 import { SettingsSheet } from "./components/SettingsSheet.tsx";
 import { EmptyState, Banner, GridSkeleton, Showcase, StatPill, WelcomeDialog } from "./components/common.tsx";
@@ -272,7 +272,7 @@ export function App() {
   }
 
   function dismissFeatures() {
-    const latest = (replayFeatures ? FEATURES : featureNotes).at(-1);
+    const latest = FEATURES.at(-1);
     if (latest) window.localStorage.setItem(SEEN_FEATURE_KEY, latest.id);
     setFeatureNotes([]);
     setReplayFeatures(false);
@@ -595,6 +595,7 @@ export function App() {
           <Brand onOpen={openPage} />
           <NavTabs page={page} counts={counts} onOpen={openPage} className="mx-auto hidden lg:flex" />
           <div className="ml-auto flex items-center gap-1 lg:ml-0">
+            <TraderSearch onOpen={openPage} />
             <HelpButton onOpen={openPage} />
             <SettingsSheet
               settings={settings}
@@ -666,7 +667,7 @@ export function App() {
             !welcomeOpen &&
             (replayFeatures || (settings.featureNotes && featureNotes.length > 0))
           }
-          notes={replayFeatures ? FEATURES : featureNotes}
+          notes={replayFeatures ? [...FEATURES].reverse() : featureNotes}
           onDismiss={dismissFeatures}
           onDisable={disableFeatures}
         />

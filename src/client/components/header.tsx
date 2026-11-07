@@ -1,9 +1,10 @@
-import { CircleHelp, LogIn, LogOut, Sparkles } from "lucide-react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { CircleHelp, LogIn, LogOut, Search, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { PAGES, type Page, type SessionUser } from "../model.ts";
+import { PAGES, type Page, type SessionUser, type Trader } from "../model.ts";
 
 export function formatSyncedAt(value: string): string {
   const date = new Date(value);
@@ -104,6 +105,150 @@ export function NavTabs({
         );
       })}
     </nav>
+  );
+}
+
+export function TraderSearch({ onOpen }: { onOpen: (page: Page, href: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [traders, setTraders] = useState<Trader[] | null>(null);
+  const [active, setActive] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  const needle = query.trim();
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointer(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointer);
+    return () => document.removeEventListener("pointerdown", onPointer);
+  }, [open]);
+
+  useEffect(() => {
+    if (needle.length < 2) {
+      setTraders(null);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void fetch(`/api/traders?q=${encodeURIComponent(needle)}`, { signal: controller.signal })
+        .then((response) => (response.ok ? response.json() : Promise.reject(new Error("search failed"))))
+        .then((body: { traders?: Trader[] }) => {
+          setTraders(body.traders ?? []);
+          setActive(0);
+        })
+        .catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === "AbortError") return;
+          setTraders([]);
+        });
+    }, 180);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [needle]);
+
+  function choose(trader: Trader) {
+    setOpen(false);
+    setQuery("");
+    setTraders(null);
+    onOpen("profile", `/u/${trader.id}`);
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      setOpen(false);
+      return;
+    }
+    if (!traders || traders.length === 0) return;
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      setActive((current) => (current + step + traders.length) % traders.length);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const trader = traders[Math.min(active, traders.length - 1)];
+      if (trader) choose(trader);
+    }
+  }
+
+  return (
+    <div ref={rootRef} className="relative">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="Find a trader"
+            aria-expanded={open}
+            aria-controls={listId}
+            className={cn("rounded-full text-white/70", open && "bg-white/10 text-white")}
+            onClick={() => setOpen((current) => !current)}
+          >
+            <Search />
+            <span className="hidden xl:inline">Find a trader</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Find a trader</TooltipContent>
+      </Tooltip>
+      {open ? (
+        <div className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-[#1c1830] p-2 shadow-[0_18px_50px_-20px_rgba(0,0,0,0.8)]">
+          <input
+            autoFocus
+            type="search"
+            role="combobox"
+            aria-expanded={open}
+            aria-controls={listId}
+            aria-activedescendant={traders?.[active] ? `${listId}-${traders[active].id}` : undefined}
+            aria-label="Search traders"
+            value={query}
+            placeholder="Name, Discord, or KCC name"
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={onKeyDown}
+            className="h-10 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm outline-none placeholder:text-white/40 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-search-cancel-button]:hidden"
+          />
+          <div id={listId} role="listbox" aria-label="Traders" className="mt-1">
+            {needle.length < 2 ? (
+              <p className="px-2 py-3 text-sm text-white/45">Type at least 2 characters.</p>
+            ) : traders === null ? (
+              <p className="px-2 py-3 text-sm text-white/45">Searching…</p>
+            ) : traders.length === 0 ? (
+              <p className="px-2 py-3 text-sm text-white/45">No traders match.</p>
+            ) : (
+              traders.map((trader, index) => (
+                <button
+                  key={trader.id}
+                  id={`${listId}-${trader.id}`}
+                  type="button"
+                  role="option"
+                  aria-selected={index === active}
+                  onMouseEnter={() => setActive(index)}
+                  onClick={() => choose(trader)}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left outline-none",
+                    index === active ? "bg-white/10" : "hover:bg-white/[0.06]",
+                  )}
+                >
+                  <Avatar className="size-8">
+                    <AvatarImage src={trader.avatarUrl} alt="" />
+                    <AvatarFallback>{trader.name.slice(0, 1)}</AvatarFallback>
+                  </Avatar>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">{trader.name}</span>
+                    <span className="block truncate text-xs text-white/50">
+                      @{trader.username}
+                      {trader.kccName ? ` · ${trader.kccName} on KCC` : ""}
+                    </span>
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
