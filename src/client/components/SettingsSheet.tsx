@@ -181,6 +181,23 @@ export function SettingsSheet({
                 />
               </div>
             </section>
+            <section className="flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h4 id="wishlist-marks-label" className="font-display text-base font-bold">
+                    Wishlist counts
+                  </h4>
+                  <p className="text-sm text-white/60">
+                    A heart on catalog, For trade, and Wishlist cards showing how many traders have that card on their Wishlist.
+                  </p>
+                </div>
+                <Switch
+                  labelledBy="wishlist-marks-label"
+                  checked={settings.wishlistMarks}
+                  onChange={(wishlistMarks) => onChange({ ...settings, wishlistMarks })}
+                />
+              </div>
+            </section>
             {signedIn ? (
               <section className="flex flex-col gap-3">
                 <div className="flex items-start justify-between gap-4">

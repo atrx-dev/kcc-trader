@@ -17,7 +17,7 @@ import {
 import { isSpare, ownsCard, readOwned, SyncCooldownError, type OwnedResponse, type SyncedProfile } from "./owned.ts";
 import { profileEmbed, withProfileMeta } from "./embed.ts";
 import { addSsArtwork, discoverHiddenCards, readCatalog, stepCatalogSync } from "./sync.ts";
-import { findTrades } from "./trades.ts";
+import { findTrades, wishlistDemand } from "./trades.ts";
 import { cardKey } from "./types.ts";
 
 function sameUser(left: SessionUser, right: SessionUser): boolean {
@@ -163,7 +163,8 @@ export default {
     if (url.pathname === "/api/trades" && request.method === "GET") {
       const user = await readSession(request, env);
       if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
-      return Response.json({ matches: await findTrades(env, user.id) });
+      const [matches, demand] = await Promise.all([findTrades(env, user.id), wishlistDemand(env, user.id)]);
+      return Response.json({ matches, demand });
     }
 
     if (url.pathname === "/api/traders" && request.method === "GET") {

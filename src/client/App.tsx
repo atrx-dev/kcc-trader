@@ -62,7 +62,7 @@ export function App() {
   const [ownedSyncFailed, setOwnedSyncFailed] = useState(false);
   const [, setSyncTick] = useState(0);
   const [catalogVersion, setCatalogVersion] = useState(0);
-  const [trades, setTrades] = useState<TradesState>({ status: "idle", matches: [] });
+  const [trades, setTrades] = useState<TradesState>({ status: "idle", matches: [], demand: {} });
   const [tradesVersion, setTradesVersion] = useState(0);
   const [seenTrades, setSeenTrades] = useState<Set<string>>(new Set());
 
@@ -195,19 +195,19 @@ export function App() {
 
   useEffect(() => {
     if (!user) {
-      setTrades({ status: "idle", matches: [] });
+      setTrades({ status: "idle", matches: [], demand: {} });
       setSeenTrades(new Set());
       return;
     }
     setSeenTrades(readSeenTrades(user.id));
-    setTrades((current) => (current.status === "ready" ? current : { status: "loading", matches: current.matches }));
+    setTrades((current) => (current.status === "ready" ? current : { ...current, status: "loading" }));
     const controller = new AbortController();
     fetch("/api/trades", { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error("Could not find trades");
-        return response.json() as Promise<{ matches: TradeMatch[] }>;
+        return response.json() as Promise<{ matches: TradeMatch[]; demand?: Record<string, number> }>;
       })
-      .then((data) => setTrades({ status: "ready", matches: data.matches }))
+      .then((data) => setTrades({ status: "ready", matches: data.matches, demand: data.demand ?? {} }))
       .catch((cause: unknown) => {
         if (cause instanceof DOMException && cause.name === "AbortError") return;
         setTrades((current) => ({ ...current, status: "error" }));
@@ -440,6 +440,7 @@ export function App() {
       catalogDefaults: withoutRarities(next.catalogDefaults, next.hiddenRarities),
       cardEffects: next.cardEffects,
       featureNotes: next.featureNotes,
+      wishlistMarks: next.wishlistMarks,
     };
     setSettings(cleaned);
     window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(cleaned));
@@ -591,6 +592,12 @@ export function App() {
       }),
     [trades.matches, byKey],
   );
+  const wantedBy = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (trades.status !== "ready") return counts;
+    for (const [key, count] of Object.entries(trades.demand)) if (count > 0) counts.set(key, count);
+    return counts;
+  }, [trades.status, trades.demand]);
   const mutualMatches = useMemo(
     () => tradeMatches.filter((match) => match.theyHave.length > 0 && match.theyWant.length > 0),
     [tradeMatches],
@@ -758,6 +765,7 @@ export function App() {
             onPriority={setPriority}
             unlistedDuplicates={unlistedDuplicates}
             owned={owned}
+            wanted={settings.wishlistMarks ? wantedBy : undefined}
           />
         ) : (
           <>
@@ -839,6 +847,7 @@ export function App() {
                       card={card}
                       copies={duplicateCount(card, owned)}
                       priority={onWishlist && priorityKeys.has(key)}
+                      wanted={settings.wishlistMarks ? (wantedBy.get(key) ?? 0) : 0}
                       onPriority={() => setPriority(key, !(onWishlist && priorityKeys.has(key)))}
                     />
                     <CatalogActions

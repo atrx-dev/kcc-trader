@@ -52,6 +52,12 @@ export const FEATURES: FeatureNote[] = [
     body: "On Trades, switch to who has a card on your Wishlist, or who wants a card you're offering. People who are already a match stay under Matches.",
     image: "/features/trade-views.svg",
   },
+  {
+    id: "wishlist-counts",
+    title: "Wishlist counts",
+    body: "A rose heart on a card is how many other traders have it on their Wishlist. It shows in the catalog, on For trade, and on your Wishlist.",
+    image: "/features/wishlist-counts.svg",
+  },
 ];
 
 function newestFirst(notes: readonly FeatureNote[]): FeatureNote[] {

@@ -1,5 +1,5 @@
 import { type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { Copy, Star } from "lucide-react";
+import { Copy, Heart, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isNewCard, type Card } from "../../types.ts";
 import { frameUrl, namePlateStyle } from "../frame.ts";
@@ -110,14 +110,21 @@ function PriorityToggle({ active, onClick }: { active: boolean; onClick: () => v
   );
 }
 
-function NewMark({ offset }: { offset: boolean }) {
+function WantedMark({ count }: { count: number }) {
   return (
     <span
-      className={cn(
-        "new-mark pointer-events-none absolute left-3 z-10 inline-flex items-center rounded-full bg-sky-200 px-1.5 py-1 text-[11px] leading-none font-bold text-sky-950 shadow-[0_2px_10px_rgba(0,0,0,0.5)]",
-        offset ? "top-10" : "top-3",
-      )}
+      className="pointer-events-none inline-flex h-5 items-center gap-1 rounded-full bg-rose-200 px-1.5 py-1 text-[11px] leading-none font-bold text-rose-950 shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
+      aria-label={count === 1 ? "1 person has this wishlisted" : `${count} people have this wishlisted`}
     >
+      <Heart className="size-3 shrink-0 fill-current" aria-hidden="true" />
+      <span className="tabular-nums">{count}</span>
+    </span>
+  );
+}
+
+function NewMark() {
+  return (
+    <span className="new-mark pointer-events-none inline-flex h-5 items-center rounded-full bg-sky-200 px-1.5 py-1 text-[11px] leading-none font-bold text-sky-950 shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
       New
     </span>
   );
@@ -126,7 +133,7 @@ function NewMark({ offset }: { offset: boolean }) {
 function DuplicateMark({ count }: { count: number }) {
   return (
     <span
-      className="duplicate-mark pointer-events-none absolute top-3 left-3 z-10 inline-flex max-w-[78%] items-center gap-1 rounded-full bg-[#f3d58f] px-1.5 py-1 text-[11px] leading-none font-bold text-[#1b1509] shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
+      className="duplicate-mark pointer-events-none inline-flex h-5 max-w-full items-center gap-1 rounded-full bg-[#f3d58f] px-1.5 py-1 text-[11px] leading-none font-bold text-[#1b1509] shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
       aria-label={`Duplicate, ${count} copies`}
     >
       <Copy className="size-3 shrink-0" aria-hidden="true" />
@@ -140,11 +147,13 @@ export function CardFace({
   card,
   copies = 0,
   priority = false,
+  wanted = 0,
   onPriority,
 }: {
   card: Card;
   copies?: number;
   priority?: boolean;
+  wanted?: number;
   onPriority?: () => void;
 }) {
   const holo = card.rank === "S" || card.rank === "SS" || card.rank === "SSS";
@@ -154,7 +163,7 @@ export function CardFace({
       className={holo ? "card framed-card foil" : "card framed-card"}
       data-rank={card.rank}
       data-sss-border={card.rank === "SSS" ? card.border || "starry" : undefined}
-      aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${fresh ? ", new" : ""}${priority ? ", priority" : ""}${copies > 1 ? `, ${copies} copies` : ""}`}
+      aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${fresh ? ", new" : ""}${priority ? ", priority" : ""}${copies > 1 ? `, ${copies} copies` : ""}${wanted > 0 ? `, wishlisted by ${wanted}` : ""}`}
     >
       {card.image ? (
         <img className="card-artwork" src={card.image} alt="" decoding="async" />
@@ -173,8 +182,13 @@ export function CardFace({
     <div className="card-stack">
       {holo ? <FoilCard card={card}>{face}</FoilCard> : face}
       {onPriority ? <PriorityToggle active={priority} onClick={onPriority} /> : priority ? <PriorityMark /> : null}
-      {copies > 1 ? <DuplicateMark count={copies} /> : null}
-      {fresh ? <NewMark offset={copies > 1} /> : null}
+      {copies > 1 || fresh || wanted > 0 ? (
+        <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-3.25rem)] flex-wrap items-center gap-1">
+          {copies > 1 ? <DuplicateMark count={copies} /> : null}
+          {fresh ? <NewMark /> : null}
+          {wanted > 0 ? <WantedMark count={wanted} /> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

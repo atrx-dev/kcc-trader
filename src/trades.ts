@@ -26,6 +26,26 @@ const MATCH_QUERY = `
   WHERE mine.trader_id = ?1 AND theirs.trader_id != ?1 AND traders.accepting = 1 AND traders.last_seen_at >= ?2
   ORDER BY theirs.added_at DESC`;
 
+const DEMAND_QUERY = `
+  SELECT list_entries.card_key AS card_key, COUNT(*) AS demand
+  FROM list_entries
+  JOIN traders ON traders.id = list_entries.trader_id
+  WHERE list_entries.list = 'wishlist' AND list_entries.trader_id != ?1
+    AND traders.accepting = 1 AND traders.last_seen_at >= ?2
+  GROUP BY list_entries.card_key`;
+
+export async function wishlistDemand(env: ListEnv, userId: string): Promise<Record<string, number>> {
+  const { results } = await env.DB.prepare(DEMAND_QUERY)
+    .bind(userId, Date.now() - INACTIVE_AFTER)
+    .all<{ card_key: string; demand: number }>();
+  const demand: Record<string, number> = {};
+  for (const row of results) {
+    const count = Number(row.demand);
+    if (count > 0) demand[row.card_key] = count;
+  }
+  return demand;
+}
+
 export async function findTrades(env: ListEnv, userId: string): Promise<TradeMatch[]> {
   const { results } = await env.DB.prepare(MATCH_QUERY).bind(userId, Date.now() - INACTIVE_AFTER).all<MatchRow>();
   const byTrader = new Map<string, TradeMatch>();

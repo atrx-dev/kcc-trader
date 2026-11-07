@@ -99,6 +99,7 @@ export interface TradeMatch {
 export interface TradesState {
   status: "idle" | "loading" | "ready" | "error";
   matches: TradeMatch[];
+  demand: Record<string, number>;
 }
 
 export function seenTradesKey(userId: string): string {
@@ -169,6 +170,7 @@ export interface Settings {
   catalogDefaults: Filters;
   cardEffects: boolean;
   featureNotes: boolean;
+  wishlistMarks: boolean;
 }
 
 export const SETTINGS_KEY = "kcc-trader:settings";
@@ -177,6 +179,7 @@ export const DEFAULT_SETTINGS: Settings = {
   catalogDefaults: NO_FILTERS,
   cardEffects: false,
   featureNotes: true,
+  wishlistMarks: true,
 };
 
 export function stringList(value: unknown): string[] {
@@ -190,6 +193,7 @@ export function loadSettings(): Settings {
       catalogDefaults?: { facets?: Partial<Record<FacetId, unknown>>; owned?: unknown; duplicates?: unknown };
       cardEffects?: unknown;
       featureNotes?: unknown;
+      wishlistMarks?: unknown;
     } | null;
     if (!raw) return DEFAULT_SETTINGS;
     const facets = { ...NO_FACETS };
@@ -208,6 +212,7 @@ export function loadSettings(): Settings {
       },
       cardEffects: raw.cardEffects === true,
       featureNotes: raw.featureNotes !== false,
+      wishlistMarks: raw.wishlistMarks !== false,
     };
   } catch {
     return DEFAULT_SETTINGS;

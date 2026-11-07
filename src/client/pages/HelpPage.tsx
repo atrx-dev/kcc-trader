@@ -62,7 +62,8 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
             For trade
           </PageLink>{" "}
           is cards you're happy to give away. You can only list cards you own, and the search on that page only offers
-          cards from your collection.
+          cards from your collection. A rose heart on one of those cards, and on the catalog, is how many other traders
+          have that card on their Wishlist. The same heart shows on your Wishlist, where it is how many other traders are hunting that card. Wishlist counts in Settings hides it.
         </p>
         <p>
           <PageLink page="wishlist" href="/wishlist" onOpen={onOpen}>

@@ -31,6 +31,7 @@ export function ListPage({
   onPriority,
   unlistedDuplicates,
   owned,
+  wanted,
 }: {
   list: ListName;
   user: SessionUser | null;
@@ -52,6 +53,7 @@ export function ListPage({
   onPriority: (key: string, priority: boolean) => void;
   unlistedDuplicates: Card[];
   owned: OwnedState;
+  wanted?: ReadonlyMap<string, number>;
 }) {
   const copy = LIST_COPY[list];
   const Icon = copy.icon;
@@ -210,7 +212,12 @@ export function ListPage({
                 const starred = list === "wishlist" && priority.has(key);
                 return (
                   <>
-                    <CardFace card={card} copies={duplicateCount(card, owned)} priority={starred} />
+                    <CardFace
+                      card={card}
+                      copies={duplicateCount(card, owned)}
+                      priority={starred}
+                      wanted={wanted?.get(key) ?? 0}
+                    />
                     {list === "wishlist" ? (
                       <div className="grid grid-cols-2 gap-1.5">
                         <ToggleAction
