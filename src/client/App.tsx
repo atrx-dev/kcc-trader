@@ -501,11 +501,12 @@ export function App() {
   const catalogOptions = useMemo(() => facetOptionsFor(cards), [cards]);
   const heroStats = useMemo(() => {
     const options = facetOptionsFor(sortedCatalog);
+    const games = new Set(sortedCatalog.map((card) => card.game).filter(Boolean));
     return {
       cards: sortedCatalog.length,
       sss: sortedCatalog.filter((card) => card.rank === "SSS").length,
       developers: options.developer.length,
-      games: options.game.length,
+      games: games.size,
     };
   }, [sortedCatalog]);
   const showcase = useMemo(() => {
@@ -641,8 +642,8 @@ export function App() {
       <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#151223]/95">
         <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-4 md:px-8">
           <Brand onOpen={openPage} />
-          <NavTabs page={page} counts={counts} attention={{ trades: tradeAttention }} onOpen={openPage} className="mx-auto hidden lg:flex" />
-          <div className="ml-auto flex items-center gap-1 lg:ml-0">
+          <NavTabs page={page} counts={counts} attention={{ trades: tradeAttention }} onOpen={openPage} className="mx-auto hidden xl:flex" />
+          <div className="ml-auto flex items-center gap-1 xl:ml-0">
             <TraderSearch onOpen={openPage} />
             <HelpButton onOpen={openPage} />
             <SettingsSheet
@@ -665,7 +666,7 @@ export function App() {
             {userLoaded ? <AccountMenu user={user} privateProfile={needsPublicProfile} onOpen={openPage} /> : null}
           </div>
         </div>
-        <div className="hidden px-4 pb-3 sm:block lg:hidden">
+        <div className="hidden px-4 pb-3 sm:block xl:hidden">
           <NavTabs page={page} counts={counts} attention={{ trades: tradeAttention }} onOpen={openPage} />
         </div>
       </header>

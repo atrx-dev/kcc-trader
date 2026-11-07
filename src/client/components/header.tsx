@@ -74,7 +74,7 @@ export function NavTabs({
               "flex min-w-0 items-center justify-center font-medium whitespace-nowrap transition-colors",
               stacked
                 ? "h-[52px] flex-col gap-1 rounded-xl text-[0.7rem]"
-                : "h-9 flex-1 gap-2 rounded-full px-3.5 text-sm lg:flex-none",
+                : "h-9 flex-1 gap-2 rounded-full px-3.5 text-sm xl:flex-none",
               active
                 ? "bg-[#f3d58f] text-[#1b1509] shadow-[0_8px_22px_-10px_rgba(243,213,143,0.8)]"
                 : "text-white/70 hover:bg-white/[0.07] hover:text-white",

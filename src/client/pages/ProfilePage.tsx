@@ -258,7 +258,7 @@ export function ProfilePage({
       <div>
         <nav
           aria-label="Profile lists"
-          className="sticky top-[4.375rem] z-30 mb-4 flex gap-1 rounded-full border border-white/10 bg-[#151223] p-1 sm:top-[7.875rem] lg:top-[4.375rem]"
+          className="sticky top-[4.375rem] z-30 mb-4 flex gap-1 rounded-full border border-white/10 bg-[#151223] p-1 sm:top-[7.875rem] xl:top-[4.375rem]"
         >
           <button
             type="button"

@@ -350,7 +350,6 @@ export function isDuplicate(card: Card, owned: OwnedState): boolean {
 }
 
 export const RANK_ORDER = ["Common", "B", "A", "S", "SS", "SSS"];
-export const TYPE_ORDER = ["Character", "Halloween event", "Hidden"];
 export const AUTH_ERRORS: Record<string, string> = {
   discord_config: "Discord login still needs a client id and secret.",
   discord_denied: "Discord sign-in was cancelled.",
@@ -476,6 +475,7 @@ export function cardTypeLabel(card: Card): string {
   ) {
     return "Halloween event";
   }
+  if (card.game.trim().toLowerCase() === "promos") return "Promo";
   if (card.hidden) return "Hidden";
   return "Character";
 }
@@ -491,11 +491,16 @@ export function orderedValues(values: string[], order: string[]): string[] {
   return [...known, ...extra];
 }
 
+function showsInGameFilter(card: Card): boolean {
+  const type = cardTypeLabel(card);
+  return type !== "Promo" && type !== "Hidden";
+}
+
 export function facetOptionsFor(cards: Card[]): Record<FacetId, string[]> {
   return {
     rarity: orderedValues(cards.map((card) => card.rank), RANK_ORDER),
-    type: orderedValues(cards.map(cardTypeLabel), TYPE_ORDER),
-    game: uniqueSorted(cards.map((card) => card.game)),
+    type: uniqueSorted(cards.map(cardTypeLabel)),
+    game: uniqueSorted(cards.filter(showsInGameFilter).map((card) => card.game)),
     developer: uniqueSorted(cards.map((card) => card.creator)),
   };
 }
