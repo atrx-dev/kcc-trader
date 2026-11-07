@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { cardKey, type Card } from "../../types.ts";
-import { duplicateCount, kccTradeUrl, lastSeenLabel, type OwnedState, type Page, type SessionUser, type Trader } from "../model.ts";
+import { duplicateCount, kccTradeUrl, lastSeenLabel, tradeViewHref, type OwnedState, type Page, type SessionUser, type TradeView, type Trader } from "../model.ts";
 import { CardFace } from "../components/cards.tsx";
 import { EmptyState } from "../components/common.tsx";
 
@@ -119,8 +119,6 @@ export function TraderMatch({
   );
 }
 
-type TradeView = "matches" | "you-want" | "they-want";
-
 const VIEWS: { id: TradeView; label: string; icon: typeof Handshake; tone: string; blurb: string }[] = [
   {
     id: "matches",
@@ -193,6 +191,8 @@ export function TradesPage({
   onOpen,
   accepting,
   owned,
+  view,
+  onView,
 }: {
   accepting: boolean;
   user: SessionUser | null;
@@ -205,8 +205,9 @@ export function TradesPage({
   onRetry: () => void;
   onOpen: (page: Page, href: string) => void;
   owned: OwnedState;
+  view: TradeView;
+  onView: (view: TradeView) => void;
 }) {
-  const [view, setView] = useState<TradeView>("matches");
   const counts: Record<TradeView, number> = { matches: 0, "you-want": 0, "they-want": 0 };
   for (const match of matches) {
     if (inView(match, "matches")) counts.matches += 1;
@@ -242,12 +243,15 @@ export function TradesPage({
             const active = view === item.id;
             const Icon = item.icon;
             return (
-              <button
+              <a
                 key={item.id}
-                type="button"
+                href={tradeViewHref(item.id)}
                 role="tab"
                 aria-selected={active}
-                onClick={() => setView(item.id)}
+                onClick={(event) => {
+                  event.preventDefault();
+                  onView(item.id);
+                }}
                 className={cn(
                   "flex h-9 min-w-0 flex-1 items-center justify-center gap-2 rounded-full px-2 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                   active ? "bg-[#f3d58f] text-[#1b1509]" : "text-white/70 hover:bg-white/[0.07] hover:text-white",
@@ -256,7 +260,7 @@ export function TradesPage({
                 <Icon className={cn("size-4 shrink-0", active ? "text-[#1b1509]" : item.tone)} />
                 <span className="truncate">{item.label}</span>
                 <span className={cn("tabular-nums", active ? "text-[#1b1509]/70" : "text-white/45")}>{counts[item.id]}</span>
-              </button>
+              </a>
             );
           })}
         </div>

@@ -3,7 +3,7 @@ import { RotateCcw, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cardKey, type Card, type Catalog } from "../types.ts";
 import { VirtualGrid } from "./VirtualGrid.tsx";
-import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, byName, newestFirst, mostDesired, type CatalogSort, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters, seenTradesKey, tradeSignature, readSeenTrades } from "./model.ts";
+import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, byName, newestFirst, mostDesired, type CatalogSort, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, tradeViewFromPath, tradeViewHref, type TradeView, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters, seenTradesKey, tradeSignature, readSeenTrades } from "./model.ts";
 import { CardFace } from "./components/cards.tsx";
 import { formatSyncedAt, Brand, NavTabs, AccountMenu, HelpButton, TraderSearch } from "./components/header.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
@@ -51,6 +51,7 @@ export function App() {
   const [featureNotes, setFeatureNotes] = useState(() => unseenFeatures(window.localStorage.getItem(SEEN_FEATURE_KEY)));
   const [replayFeatures, setReplayFeatures] = useState(false);
   const [page, setPage] = useState<Page>(INITIAL_PAGE);
+  const [tradeView, setTradeView] = useState<TradeView>(() => tradeViewFromPath(window.location.pathname));
   const [profileId, setProfileId] = useState(() => profileIdFromPath(window.location.pathname));
   const [query, setQuery] = useState(INITIAL_URL_STATE.query);
   const [pageFilters, setPageFilters] = useState<Record<Page, Filters>>(INITIAL_PAGE_FILTERS);
@@ -108,6 +109,7 @@ export function App() {
       const next = pageFromPath(window.location.pathname);
       const state = readUrlState(window.location.search);
       setPage(next);
+      setTradeView(tradeViewFromPath(window.location.pathname));
       setProfileId(profileIdFromPath(window.location.pathname));
       setQuery(state.query);
       setPageFilters((current) => ({ ...current, [next]: state.filters }));
@@ -250,11 +252,20 @@ export function App() {
       window.history.pushState(null, "", `${href}${urlSearchFor("", pageFilters[next])}`);
     }
     setPage(next);
+    setTradeView(tradeViewFromPath(href));
     setProfileId(profileIdFromPath(href));
     setQuery("");
     setListError(null);
     setNotice(null);
     window.scrollTo({ top: 0 });
+  }
+
+  function openTradeView(next: TradeView) {
+    const href = tradeViewHref(next);
+    if (window.location.pathname !== href) {
+      window.history.pushState(null, "", `${href}${window.location.search}${window.location.hash}`);
+    }
+    setTradeView(next);
   }
 
   function receiveLists(data: Lists & { welcome?: boolean }) {
@@ -741,6 +752,8 @@ export function App() {
             onOpen={openPage}
             accepting={lists.accepting !== false}
             owned={owned}
+            view={tradeView}
+            onView={openTradeView}
           />
         ) : listName ? (
           <ListPage

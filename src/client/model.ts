@@ -36,6 +36,7 @@ export interface ListSync {
 
 export type ListName = "forTrade" | "wishlist";
 export type Page = "catalog" | ListName | "trades" | "profile" | "help";
+export type TradeView = "matches" | "you-want" | "they-want";
 
 export interface ListChange {
   list: ListName;
@@ -391,9 +392,18 @@ export function pageFromPath(path: string): Page {
   if (path === "/help" || path === "/help/") return "help";
   if (path === "/for-trade") return "forTrade";
   if (path === "/wishlist" || path === "/wanted") return "wishlist";
-  if (path === "/trades") return "trades";
+  if (/^\/trades(\/(you-want|they-want))?\/?$/.test(path)) return "trades";
   if (profileIdFromPath(path)) return "profile";
   return "catalog";
+}
+
+export function tradeViewFromPath(path: string): TradeView {
+  const view = path.match(/^\/trades\/(you-want|they-want)\/?$/)?.[1];
+  return view === "you-want" || view === "they-want" ? view : "matches";
+}
+
+export function tradeViewHref(view: TradeView): string {
+  return view === "matches" ? "/trades" : `/trades/${view}`;
 }
 
 export function profileIdFromPath(path: string): string | null {
