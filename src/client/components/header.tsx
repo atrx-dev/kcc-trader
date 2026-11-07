@@ -180,7 +180,7 @@ export function TraderSearch({ onOpen }: { onOpen: (page: Page, href: string) =>
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="sm:relative">
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
@@ -199,7 +199,7 @@ export function TraderSearch({ onOpen }: { onOpen: (page: Page, href: string) =>
         <TooltipContent>Find a trader</TooltipContent>
       </Tooltip>
       {open ? (
-        <div className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-[#1c1830] p-2 shadow-[0_18px_50px_-20px_rgba(0,0,0,0.8)]">
+        <div className="absolute top-full right-4 left-4 z-50 mt-2 rounded-2xl border border-white/10 bg-[#1c1830] p-2 shadow-[0_18px_50px_-20px_rgba(0,0,0,0.8)] sm:top-auto sm:right-0 sm:left-auto sm:w-[min(22rem,calc(100vw-2rem))]">
           <input
             autoFocus
             type="search"
