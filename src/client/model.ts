@@ -208,7 +208,7 @@ export const OWNED_CHOICES: { value: OwnedFilter; label: string }[] = [
   { value: "duplicates", label: "Duplicates" },
 ];
 
-export const VISIT_SYNC_MS = 12 * 60 * 60 * 1000;
+export const VISIT_SYNC_MS = 3 * 60 * 60 * 1000;
 
 export const NO_OWNED: OwnedState = {
   status: "idle",

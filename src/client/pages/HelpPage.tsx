@@ -44,7 +44,7 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
           <strong className="font-semibold text-white">Show my collection to other players</strong>.
         </p>
         <p>
-          Your collection syncs when you sign in, when you visit and the last sync was more than 12 hours ago, and when
+          Your collection syncs when you sign in, when you visit and the last sync was more than 3 hours ago, and when
           you press the sync button. The button waits an hour between tries. While it is waiting, its tooltip says when
           the next sync is.
         </p>
