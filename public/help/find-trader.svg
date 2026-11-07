@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a2148"/>
+      <stop offset="1" stop-color="#221b3c"/>
+    </linearGradient>
+    <linearGradient id="avatar" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#f7c6de"/>
+      <stop offset="1" stop-color="#7f6ad4"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="220" fill="url(#bg)"/>
+  <rect x="28" y="28" width="584" height="56" rx="28" fill="#151225" stroke="#fff" stroke-opacity="0.08"/>
+  <circle cx="64" cy="56" r="14" fill="#f3d58f"/>
+  <text x="88" y="61" fill="#fff" font-family="Segoe UI, sans-serif" font-size="16" font-weight="700">KCC Trader</text>
+  <rect x="392" y="40" width="156" height="32" rx="16" fill="#f3d58f"/>
+  <circle cx="414" cy="56" r="6" stroke="#1b1509" stroke-width="1.8"/>
+  <path d="M418.5 60.5 423 65" stroke="#1b1509" stroke-width="1.8" stroke-linecap="round"/>
+  <text x="432" y="61" fill="#1b1509" font-family="Segoe UI, sans-serif" font-size="13" font-weight="700">Find a trader</text>
+  <rect x="392" y="104" width="220" height="88" rx="16" fill="#1c1830" stroke="#fff" stroke-opacity="0.1"/>
+  <rect x="404" y="116" width="196" height="28" rx="8" fill="#fff" fill-opacity="0.06"/>
+  <text x="416" y="135" fill="#fff" fill-opacity="0.45" font-family="Segoe UI, sans-serif" font-size="13">mika</text>
+  <circle cx="424" cy="168" r="12" fill="url(#avatar)"/>
+  <text x="444" y="164" fill="#fff" font-family="Segoe UI, sans-serif" font-size="13" font-weight="700">Mika</text>
+  <text x="444" y="180" fill="#fff" fill-opacity="0.5" font-family="Segoe UI, sans-serif" font-size="11">@mika.trades</text>
+</svg>

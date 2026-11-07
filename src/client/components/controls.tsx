@@ -108,7 +108,7 @@ export function FacetFilter({
           ) : null}
         </ComboboxTrigger>
       )}
-      <ComboboxContent className="w-72">
+      <ComboboxContent className="w-[min(18rem,calc(100vw-1.5rem))] min-w-0">
         <ComboboxInput showTrigger={false} placeholder={`Search ${label.toLowerCase()}…`} />
         <ComboboxEmpty>No matches.</ComboboxEmpty>
         <ComboboxList>
@@ -146,7 +146,7 @@ export function OwnedToggle({
       role="radiogroup"
       aria-label="Owned"
       className={cn(
-        "inline-flex h-9 items-center rounded-full border border-white/10 bg-white/[0.04] p-1",
+        "inline-flex h-9 max-w-full items-center rounded-full border border-white/10 bg-white/[0.04] p-1",
         disabled && "opacity-50",
         className,
       )}
@@ -180,7 +180,15 @@ const SORT_CHOICES: { value: CatalogSort; label: string }[] = [
   { value: "added", label: "Newest" },
 ];
 
-export function SortToggle({ value, onChange }: { value: CatalogSort; onChange: (value: CatalogSort) => void }) {
+export function SortToggle({
+  value,
+  onChange,
+  field = false,
+}: {
+  value: CatalogSort;
+  onChange: (value: CatalogSort) => void;
+  field?: boolean;
+}) {
   const current = SORT_CHOICES.find((choice) => choice.value === value) ?? SORT_CHOICES[0];
   const custom = value !== "rarity";
   return (
@@ -195,16 +203,27 @@ export function SortToggle({ value, onChange }: { value: CatalogSort; onChange: 
       <ComboboxTrigger
         aria-label={`Sort, ${current.label}`}
         className={cn(
-          "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+          "h-9 items-center border text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+          field
+            ? "flex w-full min-w-0 gap-2 rounded-xl px-3 text-left"
+            : "inline-flex gap-1.5 rounded-full px-3.5 font-medium",
           custom
             ? "border-amber-200/40 bg-amber-200/[0.1] text-amber-50"
             : "border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.08] hover:text-white",
         )}
       >
-        Sort
-        <span className={cn("max-w-36 truncate", custom ? "text-amber-100/75" : "text-white/55")}>{current.label}</span>
+        {field ? null : "Sort"}
+        <span
+          className={cn(
+            "truncate",
+            field ? "min-w-0 flex-1" : "max-w-36",
+            custom ? "text-amber-100/75" : field ? "text-white/80" : "text-white/55",
+          )}
+        >
+          {current.label}
+        </span>
       </ComboboxTrigger>
-      <ComboboxContent className="w-44">
+      <ComboboxContent className={field ? "w-[min(18rem,calc(100vw-1.5rem))] min-w-0" : "w-44"}>
         <ComboboxList>
           {(item: string) => (
             <ComboboxItem key={item} value={item}>
@@ -275,6 +294,87 @@ export interface OwnedControls {
   onSync: () => void;
 }
 
+function OwnedField({
+  value,
+  disabled,
+  choices = OWNED_CHOICES.map((choice) => choice.value),
+  onChange,
+}: {
+  value: OwnedFilter;
+  disabled: boolean;
+  choices?: OwnedFilter[];
+  onChange: (value: OwnedFilter) => void;
+}) {
+  const options = OWNED_CHOICES.filter((choice) => choices.includes(choice.value));
+  const current = options.find((choice) => choice.value === value) ?? options[0];
+  const custom = current.value !== "all";
+  return (
+    <Combobox
+      items={options.map((choice) => choice.label)}
+      value={current.label}
+      disabled={disabled}
+      onValueChange={(next: string | null) => {
+        const choice = options.find((item) => item.label === next);
+        if (choice) onChange(choice.value);
+      }}
+    >
+      <ComboboxTrigger
+        aria-label={`Collection, ${current.label}`}
+        className={cn(
+          "flex h-9 w-full min-w-0 items-center gap-2 rounded-xl border px-3 text-left text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+          custom
+            ? "border-amber-200/40 bg-amber-200/[0.08] text-amber-50"
+            : "border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.08]",
+        )}
+      >
+        <span className={cn("min-w-0 flex-1 truncate", custom ? "text-amber-100/75" : "text-white/80")}>{current.label}</span>
+      </ComboboxTrigger>
+      <ComboboxContent className="w-[min(18rem,calc(100vw-1.5rem))] min-w-0">
+        <ComboboxList>
+          {(item: string) => (
+            <ComboboxItem key={item} value={item}>
+              {item}
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
+  );
+}
+
+function SyncCollectionButton({ controls, className }: { controls: OwnedControls; className?: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={cn(
+            "inline-flex rounded-full",
+            controls.syncDisabled && "cursor-not-allowed outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+          )}
+          tabIndex={controls.syncDisabled ? 0 : undefined}
+          aria-label={controls.syncDisabled ? controls.syncHint : undefined}
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("rounded-full text-white/70", className)}
+            aria-label="Sync collection"
+            disabled={controls.syncDisabled}
+            onClick={controls.onSync}
+          >
+            <RefreshCw className={cn(controls.syncing && "animate-spin")} />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{controls.syncHint}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function FieldLabel({ children }: { children: string }) {
+  return <span className="px-1 text-xs font-medium text-white/50">{children}</span>;
+}
+
 export function FilterBar({
   options,
   counts,
@@ -321,9 +421,46 @@ export function FilterBar({
   }
 
   return (
-    <section aria-label="Filters" className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2 rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-2">
-        <span className="hidden items-center gap-1.5 pr-1 pl-2.5 text-sm font-semibold text-white/55 sm:inline-flex">
+    <section aria-label="Filters" className="flex min-w-0 flex-col gap-3">
+      <div className="flex flex-col gap-3 rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-3 xl:hidden">
+        <div className="grid grid-cols-2 gap-x-2 gap-y-3 sm:grid-cols-4 sm:gap-x-3">
+          {FACETS.map((facet) => (
+            <label key={facet.id} className="flex min-w-0 flex-col gap-1">
+              <FieldLabel>{facet.label}</FieldLabel>
+              <FacetFilter
+                field
+                label={facet.label}
+                options={options[facet.id]}
+                counts={counts[facet.id]}
+                selected={filters.facets[facet.id]}
+                onChange={(values) => setFacet(facet.id, values)}
+              />
+            </label>
+          ))}
+          {sort && onSort ? (
+            <label className="col-span-2 flex min-w-0 flex-col gap-1">
+              <FieldLabel>Sort</FieldLabel>
+              <SortToggle field value={sort} onChange={onSort} />
+            </label>
+          ) : null}
+          {ownedControls ? (
+            <div className={cn("col-span-2 flex min-w-0 items-end gap-1", sort && onSort ? undefined : "sm:col-span-4")}>
+              <label className="flex min-w-0 flex-1 flex-col gap-1">
+                <FieldLabel>Collection</FieldLabel>
+                <OwnedField
+                  value={filters.owned}
+                  disabled={!ownedControls.ready}
+                  choices={ownedChoices}
+                  onChange={(value) => onChange({ ...filters, owned: value })}
+                />
+              </label>
+              <SyncCollectionButton controls={ownedControls} className="size-9" />
+            </div>
+          ) : null}
+        </div>
+      </div>
+      <div className="hidden flex-wrap items-center gap-2 rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-2 xl:flex">
+        <span className="inline-flex items-center gap-1.5 pr-1 pl-2.5 text-sm font-semibold text-white/55">
           <SlidersHorizontal className="size-4" />
           Filter
         </span>
@@ -338,7 +475,7 @@ export function FilterBar({
           />
         ))}
         {ownedControls || onSort ? (
-          <div className="flex items-center gap-1 sm:ml-auto">
+          <div className="ml-auto flex items-center gap-1">
             {sort && onSort ? <SortToggle value={sort} onChange={onSort} /> : null}
             {ownedControls ? (
               <>
@@ -348,30 +485,7 @@ export function FilterBar({
                   choices={ownedChoices}
                   onChange={(value) => onChange({ ...filters, owned: value })}
                 />
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span
-                      className={cn(
-                        "inline-flex rounded-full",
-                        ownedControls.syncDisabled && "cursor-not-allowed outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                      )}
-                      tabIndex={ownedControls.syncDisabled ? 0 : undefined}
-                      aria-label={ownedControls.syncDisabled ? ownedControls.syncHint : undefined}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="rounded-full text-white/70"
-                        aria-label="Sync collection"
-                        disabled={ownedControls.syncDisabled}
-                        onClick={ownedControls.onSync}
-                      >
-                        <RefreshCw className={cn(ownedControls.syncing && "animate-spin")} />
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>{ownedControls.syncHint}</TooltipContent>
-                </Tooltip>
+                <SyncCollectionButton controls={ownedControls} />
               </>
             ) : null}
           </div>

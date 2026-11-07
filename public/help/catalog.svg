@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a2148"/>
+      <stop offset="1" stop-color="#221b3c"/>
+    </linearGradient>
+    <linearGradient id="art" x1="78" y1="32" x2="210" y2="170" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#b9ecff"/>
+      <stop offset="0.5" stop-color="#9aa6ff"/>
+      <stop offset="1" stop-color="#6a56c8"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="220" fill="url(#bg)"/>
+  <rect x="64" y="18" width="168" height="184" rx="16" fill="#120e1c"/>
+  <rect x="76" y="30" width="144" height="120" rx="10" fill="url(#art)"/>
+  <rect x="88" y="162" width="96" height="8" rx="4" fill="#fff" fill-opacity="0.88"/>
+  <rect x="88" y="176" width="62" height="6" rx="3" fill="#fff" fill-opacity="0.45"/>
+  <rect x="88" y="42" width="52" height="24" rx="12" fill="#bae6fd"/>
+  <text x="114" y="58" text-anchor="middle" fill="#082f49" font-family="Segoe UI, sans-serif" font-size="13" font-weight="700">New</text>
+  <rect x="360" y="28" width="196" height="164" rx="16" fill="#120e1c"/>
+  <text x="376" y="56" fill="#fff" fill-opacity="0.55" font-family="Segoe UI, sans-serif" font-size="12" font-weight="600">Sort</text>
+  <rect x="376" y="66" width="164" height="34" rx="10" fill="#fff" fill-opacity="0.06"/>
+  <text x="390" y="88" fill="#fff" fill-opacity="0.75" font-family="Segoe UI, sans-serif" font-size="14" font-weight="600">Rarity</text>
+  <rect x="376" y="106" width="164" height="34" rx="10" fill="#fff" fill-opacity="0.06"/>
+  <text x="390" y="128" fill="#fff" fill-opacity="0.75" font-family="Segoe UI, sans-serif" font-size="14" font-weight="600">Name</text>
+  <rect x="376" y="146" width="164" height="34" rx="10" fill="#f3d58f"/>
+  <text x="390" y="168" fill="#1b1509" font-family="Segoe UI, sans-serif" font-size="14" font-weight="700">Newest</text>
+</svg>

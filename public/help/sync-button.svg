@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a2148"/>
+      <stop offset="1" stop-color="#221b3c"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="220" fill="url(#bg)"/>
+  <rect x="36" y="24" width="568" height="172" rx="28" fill="#120e1c" stroke="#fff" stroke-opacity="0.08"/>
+  <text x="56" y="56" fill="#fff" fill-opacity="0.4" font-family="Segoe UI, sans-serif" font-size="12" font-weight="600">Rarity</text>
+  <rect x="56" y="64" width="168" height="36" rx="12" fill="#fff" fill-opacity="0.04" stroke="#fff" stroke-opacity="0.1"/>
+  <text x="70" y="87" fill="#fff" fill-opacity="0.35" font-family="Segoe UI, sans-serif" font-size="14">Any</text>
+  <text x="240" y="56" fill="#fff" fill-opacity="0.4" font-family="Segoe UI, sans-serif" font-size="12" font-weight="600">Type</text>
+  <rect x="240" y="64" width="168" height="36" rx="12" fill="#fff" fill-opacity="0.04" stroke="#fff" stroke-opacity="0.1"/>
+  <text x="254" y="87" fill="#fff" fill-opacity="0.35" font-family="Segoe UI, sans-serif" font-size="14">Any</text>
+  <text x="56" y="128" fill="#fff" fill-opacity="0.72" font-family="Segoe UI, sans-serif" font-size="12" font-weight="600">Collection</text>
+  <rect x="56" y="136" width="444" height="40" rx="12" fill="#fff" fill-opacity="0.06" stroke="#fff" stroke-opacity="0.14"/>
+  <text x="72" y="161" fill="#fff" fill-opacity="0.88" font-family="Segoe UI, sans-serif" font-size="15">All</text>
+  <path d="M470 152.5 476 158.5 482 152.5" stroke="#fff" stroke-opacity="0.45" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="548" cy="156" r="18" fill="#fff" fill-opacity="0.08"/>
+  <circle cx="548" cy="156" r="26" stroke="#f3d58f" stroke-width="2"/>
+  <g transform="translate(536,144)" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/>
+    <path d="M21 3v5h-5"/>
+    <path d="M21 12a9 9 0 0 1-15.5 6.3L3 16"/>
+    <path d="M3 21v-5h5"/>
+  </g>
+  <rect x="516" y="36" width="64" height="26" rx="13" fill="#f3d58f"/>
+  <text x="548" y="54" text-anchor="middle" fill="#1b1509" font-family="Segoe UI, sans-serif" font-size="13" font-weight="700">Sync</text>
+  <path d="M548 62v60" stroke="#f3d58f" stroke-width="1.5" stroke-dasharray="3 4"/>
+</svg>

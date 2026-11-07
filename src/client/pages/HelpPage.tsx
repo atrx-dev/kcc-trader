@@ -45,9 +45,10 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
         </p>
         <p>
           Your collection syncs when you sign in, when you visit and the last sync was more than 3 hours ago, and when
-          you press the sync button. The button waits an hour between tries. While it is waiting, its tooltip says when
-          the next sync is.
+          you press the sync button in any filter panel. It waits an hour between tries. While it is waiting, its
+          tooltip says when the next sync is.
         </p>
+        <Figure src="/help/sync-button.svg" alt="The sync button is the round arrow in the filter panel." />
         <p>
           After you make the profile public, the first-visit popup can sync right away: open your KCC profile from it,
           then choose <strong className="font-semibold text-white">I've made it public</strong>. The notice at the top
@@ -71,6 +72,10 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
           <strong className="font-semibold text-white">Priority</strong> marks the ones you want most. Star them in the
           catalog or on your Wishlist. Those stay at the top, and the star shows on your page and in trades.
         </p>
+        <Figure
+          src="/help/priority.svg"
+          alt="A gold star in the corner of a card marks it as priority. On your page the same corner reads Priority."
+        />
         <p>
           <strong className="font-semibold text-white">List duplicates for trade</strong> is off until you turn it on
           in Settings. While it's on, a sync puts new spare SS and SSS copies on For trade, and takes them off once you
@@ -99,10 +104,18 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
           Traders who haven't opened KCC Trader in 30 days are left out of matches. Their page shows{" "}
           <strong className="font-semibold text-white">Inactive</strong>.
         </p>
+        <Figure
+          src="/help/profile-status.svg"
+          alt="A profile can say Not accepting trades or Inactive next to the trader's name."
+        />
         <p>
           Offer a trade on KCC opens that person's trade page there. Share lists, on your own page, copies a link to
           your public lists. Find a trader, in the header, searches display names, Discord usernames, and KCC names.
         </p>
+        <Figure
+          src="/help/find-trader.svg"
+          alt="Find a trader is the search button in the header. It opens a list of matching profiles."
+        />
       </Article>
 
       <Article id="catalog" title="Browsing the catalog">
@@ -111,6 +124,10 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
           card new to the catalog in the last 7 days is marked New. Name sorts the catalog alphabetically. Newest
           sorts additions first, and cards from before that tracking started stay in rarity order after them.
         </p>
+        <Figure
+          src="/help/catalog.svg"
+          alt="A card new to the catalog has a New mark in the corner. Sort can be Rarity, Name, or Newest."
+        />
         <p>
           Once your collection has synced, Owned and Not owned split the catalog by what you have. Duplicates shows SS
           and SSS cards you have more than one copy of. For trade only offers All and Duplicates, because every card
@@ -129,6 +146,10 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
       </Article>
     </div>
   );
+}
+
+function Figure({ src, alt }: { src: string; alt: string }) {
+  return <img src={src} alt={alt} className="w-full rounded-2xl border border-white/10" />;
 }
 
 function Article({ id, title, children }: { id: string; title: string; children: ReactNode }) {

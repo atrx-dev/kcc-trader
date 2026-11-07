@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a2148"/>
+      <stop offset="1" stop-color="#221b3c"/>
+    </linearGradient>
+    <linearGradient id="art" x1="86" y1="36" x2="210" y2="160" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f7c6de"/>
+      <stop offset="0.5" stop-color="#c9b6ff"/>
+      <stop offset="1" stop-color="#7f6ad4"/>
+    </linearGradient>
+    <linearGradient id="art2" x1="430" y1="36" x2="554" y2="160" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#b9ecff"/>
+      <stop offset="0.55" stop-color="#9aa6ff"/>
+      <stop offset="1" stop-color="#6a56c8"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="220" fill="url(#bg)"/>
+  <rect x="70" y="22" width="156" height="176" rx="16" fill="#120e1c"/>
+  <rect x="82" y="34" width="132" height="112" rx="10" fill="url(#art)"/>
+  <rect x="94" y="158" width="88" height="8" rx="4" fill="#fff" fill-opacity="0.88"/>
+  <rect x="94" y="172" width="56" height="6" rx="3" fill="#fff" fill-opacity="0.45"/>
+  <circle cx="196" cy="52" r="14" fill="#000" fill-opacity="0.55"/>
+  <circle cx="196" cy="52" r="20" stroke="#f3d58f" stroke-width="2"/>
+  <path fill="#f3d58f" transform="translate(196 52)" d="M0-7.2 2.1-2.2 7.4-2.2 3.1.9 4.8 6.2 0 3.2-4.8 6.2-3.1.9-7.4-2.2-2.1-2.2z"/>
+  <text x="148" y="214" text-anchor="middle" fill="#f3d58f" font-family="Segoe UI, sans-serif" font-size="13" font-weight="700">Star it here</text>
+  <rect x="414" y="22" width="156" height="176" rx="16" fill="#120e1c"/>
+  <rect x="426" y="34" width="132" height="112" rx="10" fill="url(#art2)"/>
+  <rect x="438" y="158" width="88" height="8" rx="4" fill="#fff" fill-opacity="0.88"/>
+  <rect x="438" y="172" width="56" height="6" rx="3" fill="#fff" fill-opacity="0.45"/>
+  <rect x="470" y="44" width="86" height="24" rx="12" fill="#f3d58f"/>
+  <path fill="#1b1509" transform="translate(486 56)" d="M0-6 1.8-1.8 6.2-1.8 2.6.8 4 5.2 0 2.6-4 5.2-2.6.8-6.2-1.8-1.8-1.8z"/>
+  <text x="496" y="60" fill="#1b1509" font-family="Segoe UI, sans-serif" font-size="12" font-weight="700">Priority</text>
+  <text x="492" y="214" text-anchor="middle" fill="#f3d58f" font-family="Segoe UI, sans-serif" font-size="13" font-weight="700">Shown on your page</text>
+</svg>

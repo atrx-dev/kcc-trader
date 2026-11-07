@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a2148"/>
+      <stop offset="1" stop-color="#221b3c"/>
+    </linearGradient>
+    <linearGradient id="ren" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#f7c6de"/>
+      <stop offset="1" stop-color="#d46a8a"/>
+    </linearGradient>
+    <linearGradient id="mika" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#b9ecff"/>
+      <stop offset="1" stop-color="#6a56c8"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="220" fill="url(#bg)"/>
+  <rect x="48" y="28" width="544" height="164" rx="24" fill="#120e1c" stroke="#fff" stroke-opacity="0.08"/>
+  <circle cx="96" cy="78" r="22" fill="url(#ren)"/>
+  <text x="132" y="74" fill="#fff" font-family="Segoe UI, sans-serif" font-size="18" font-weight="700">Ren</text>
+  <text x="132" y="94" fill="#fff" fill-opacity="0.5" font-family="Segoe UI, sans-serif" font-size="13">@ren</text>
+  <rect x="300" y="62" width="156" height="26" rx="13" fill="#fff" fill-opacity="0.08"/>
+  <text x="378" y="80" text-anchor="middle" fill="#fff" fill-opacity="0.75" font-family="Segoe UI, sans-serif" font-size="12" font-weight="700">Not accepting trades</text>
+  <circle cx="96" cy="146" r="22" fill="url(#mika)"/>
+  <text x="132" y="142" fill="#fff" font-family="Segoe UI, sans-serif" font-size="18" font-weight="700">Mika</text>
+  <text x="132" y="162" fill="#fff" fill-opacity="0.5" font-family="Segoe UI, sans-serif" font-size="13">@mika.trades</text>
+  <rect x="300" y="130" width="84" height="26" rx="13" fill="#fff" fill-opacity="0.08"/>
+  <text x="342" y="148" text-anchor="middle" fill="#fff" fill-opacity="0.75" font-family="Segoe UI, sans-serif" font-size="12" font-weight="700">Inactive</text>
+</svg>
