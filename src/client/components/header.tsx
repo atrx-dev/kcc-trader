@@ -35,12 +35,14 @@ export function Brand({ onOpen }: { onOpen: (page: Page, href: string) => void }
 export function NavTabs({
   page,
   counts,
+  attention,
   onOpen,
   className,
   stacked = false,
 }: {
   page: Page;
   counts: Record<Page, number | null>;
+  attention?: Partial<Record<Page, boolean>>;
   onOpen: (page: Page, href: string) => void;
   className?: string;
   stacked?: boolean;
@@ -58,6 +60,7 @@ export function NavTabs({
         const active = page === item.id;
         const Icon = item.icon;
         const count = counts[item.id];
+        const fresh = attention?.[item.id] === true && count !== null && count > 0;
         return (
           <a
             key={item.id}
@@ -83,10 +86,11 @@ export function NavTabs({
                 <span
                   className={cn(
                     "absolute -top-1.5 left-3 min-w-4 rounded-full px-1 text-center text-[0.6rem] leading-4 font-bold tabular-nums",
-                    active ? "bg-[#1b1509] text-[#f3d58f]" : "bg-white/90 text-[#151223]",
+                    active ? "bg-[#1b1509] text-[#f3d58f]" : fresh ? "bg-emerald-300 text-emerald-950" : "bg-white/90 text-[#151223]",
                   )}
                 >
                   {count > 99 ? "99+" : count}
+                  {fresh ? <span className="sr-only">, new</span> : null}
                 </span>
               ) : null}
             </span>
@@ -95,10 +99,11 @@ export function NavTabs({
               <span
                 className={cn(
                   "rounded-full px-1.5 py-0.5 text-[0.7rem] leading-none font-semibold tabular-nums",
-                  active ? "bg-black/15" : "bg-white/10 text-white/70",
+                  active ? "bg-black/15" : fresh ? "bg-emerald-300 text-emerald-950" : "bg-white/10 text-white/70",
                 )}
               >
                 {count.toLocaleString()}
+                {fresh ? <span className="sr-only">, new</span> : null}
               </span>
             ) : null}
           </a>

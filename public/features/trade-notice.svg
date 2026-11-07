@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a2148"/>
+      <stop offset="1" stop-color="#221b3c"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="220" fill="url(#bg)"/>
+  <rect x="40" y="78" width="560" height="64" rx="32" fill="#151223" stroke="#fff" stroke-opacity="0.1"/>
+  <g fill="none" stroke="#fcd34d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="translate(67 101) scale(0.75)">
+    <rect width="7" height="7" x="3" y="3" rx="1"/>
+    <rect width="7" height="7" x="14" y="3" rx="1"/>
+    <rect width="7" height="7" x="14" y="14" rx="1"/>
+    <rect width="7" height="7" x="3" y="14" rx="1"/>
+  </g>
+  <text x="93" y="110" fill="#fff" fill-opacity="0.7" font-family="Segoe UI, sans-serif" font-size="16" font-weight="600" dominant-baseline="central">Catalog</text>
+  <g fill="none" stroke="#7dd3fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="translate(187 101) scale(0.75)">
+    <path d="M8 3 4 7l4 4"/>
+    <path d="M4 7h16"/>
+    <path d="m16 21 4-4-4-4"/>
+    <path d="M20 17H4"/>
+  </g>
+  <text x="213" y="110" fill="#fff" fill-opacity="0.7" font-family="Segoe UI, sans-serif" font-size="16" font-weight="600" dominant-baseline="central">For trade</text>
+  <g fill="none" stroke="#fda4af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="translate(329 101) scale(0.75)">
+    <path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"/>
+  </g>
+  <text x="355" y="110" fill="#fff" fill-opacity="0.7" font-family="Segoe UI, sans-serif" font-size="16" font-weight="600" dominant-baseline="central">Wishlist</text>
+  <g fill="none" stroke="#6ee7b7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="translate(463 101) scale(0.75)">
+    <path d="m11 17 2 2a1 1 0 1 0 3-3"/>
+    <path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/>
+    <path d="m21 3 1 11h-2"/>
+    <path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/>
+    <path d="M3 4h8"/>
+  </g>
+  <text x="489" y="110" fill="#fff" fill-opacity="0.7" font-family="Segoe UI, sans-serif" font-size="16" font-weight="600" dominant-baseline="central">Trades</text>
+  <rect x="552" y="100" width="26" height="20" rx="10" fill="#6ee7b7"/>
+  <text x="565" y="110" text-anchor="middle" fill="#022c22" font-family="Segoe UI, sans-serif" font-size="12" font-weight="700" dominant-baseline="central">3</text>
+</svg>

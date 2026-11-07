@@ -101,6 +101,23 @@ export interface TradesState {
   matches: TradeMatch[];
 }
 
+export function seenTradesKey(userId: string): string {
+  return `kcc-trader:seen-trades:${userId}`;
+}
+
+export function tradeSignature(traderId: string, theyHave: readonly string[], theyWant: readonly string[]): string {
+  return `${traderId}\n${[...theyHave].sort().join("\n")}\n${[...theyWant].sort().join("\n")}`;
+}
+
+export function readSeenTrades(userId: string): Set<string> {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(seenTradesKey(userId)) ?? "[]");
+    return new Set(Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
 export interface OwnedCards {
   ss: string[];
   sss: string[];

@@ -3,7 +3,7 @@ import { RotateCcw, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cardKey, type Card, type Catalog } from "../types.ts";
 import { VirtualGrid } from "./VirtualGrid.tsx";
-import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, byName, newestFirst, type CatalogSort, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters } from "./model.ts";
+import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, byName, newestFirst, type CatalogSort, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters, seenTradesKey, tradeSignature, readSeenTrades } from "./model.ts";
 import { CardFace } from "./components/cards.tsx";
 import { formatSyncedAt, Brand, NavTabs, AccountMenu, HelpButton, TraderSearch } from "./components/header.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
@@ -19,6 +19,10 @@ import { FEATURES, SEEN_FEATURE_KEY, unseenFeatures } from "./features.ts";
 const INITIAL_PAGE = pageFromPath(window.location.pathname);
 const INITIAL_URL_STATE = readUrlState(window.location.search);
 const INITIAL_SETTINGS = loadSettings();
+
+function matchSignature(match: { trader: { id: string }; theyHave: Card[]; theyWant: Card[] }): string {
+  return tradeSignature(match.trader.id, match.theyHave.map(cardKey), match.theyWant.map(cardKey));
+}
 const INITIAL_PAGE_FILTERS: Record<Page, Filters> = {
   ...NO_PAGE_FILTERS,
   catalog: INITIAL_SETTINGS.catalogDefaults,
@@ -60,6 +64,7 @@ export function App() {
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [trades, setTrades] = useState<TradesState>({ status: "idle", matches: [] });
   const [tradesVersion, setTradesVersion] = useState(0);
+  const [seenTrades, setSeenTrades] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const controller = new AbortController();
@@ -191,10 +196,11 @@ export function App() {
   useEffect(() => {
     if (!user) {
       setTrades({ status: "idle", matches: [] });
+      setSeenTrades(new Set());
       return;
     }
-    if (page !== "trades") return;
-    setTrades((current) => ({ ...current, status: "loading" }));
+    setSeenTrades(readSeenTrades(user.id));
+    setTrades((current) => (current.status === "ready" ? current : { status: "loading", matches: current.matches }));
     const controller = new AbortController();
     fetch("/api/trades", { signal: controller.signal })
       .then((response) => {
@@ -207,7 +213,7 @@ export function App() {
         setTrades((current) => ({ ...current, status: "error" }));
       });
     return () => controller.abort();
-  }, [user, page, listsSaved, tradesVersion]);
+  }, [user, listsSaved, tradesVersion]);
 
   async function syncOwned(force = false) {
     setOwnedSyncFailed(false);
@@ -586,14 +592,24 @@ export function App() {
       }),
     [trades.matches, byKey],
   );
+  useEffect(() => {
+    if (!user || page !== "trades" || trades.status !== "ready" || !catalog) return;
+    const next = tradeMatches.map(matchSignature);
+    setSeenTrades((current) => {
+      if (current.size === next.length && next.every((item) => current.has(item))) return current;
+      window.localStorage.setItem(seenTradesKey(user.id), JSON.stringify(next));
+      return new Set(next);
+    });
+  }, [user, page, trades.status, catalog, tradeMatches]);
   if (trades.status === "ready" && catalog) counts.trades = tradeMatches.length;
+  const tradeAttention = page !== "trades" && tradeMatches.some((match) => !seenTrades.has(matchSignature(match)));
 
   return (
     <div className="flex min-h-svh flex-col">
       <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#151223]/95">
         <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-4 md:px-8">
           <Brand onOpen={openPage} />
-          <NavTabs page={page} counts={counts} onOpen={openPage} className="mx-auto hidden lg:flex" />
+          <NavTabs page={page} counts={counts} attention={{ trades: tradeAttention }} onOpen={openPage} className="mx-auto hidden lg:flex" />
           <div className="ml-auto flex items-center gap-1 lg:ml-0">
             <TraderSearch onOpen={openPage} />
             <HelpButton onOpen={openPage} />
@@ -618,7 +634,7 @@ export function App() {
           </div>
         </div>
         <div className="hidden px-4 pb-3 sm:block lg:hidden">
-          <NavTabs page={page} counts={counts} onOpen={openPage} />
+          <NavTabs page={page} counts={counts} attention={{ trades: tradeAttention }} onOpen={openPage} />
         </div>
       </header>
 
@@ -626,6 +642,7 @@ export function App() {
         <NavTabs
           page={page}
           counts={counts}
+          attention={{ trades: tradeAttention }}
           onOpen={openPage}
           stacked
           className="rounded-none border-0 bg-transparent p-0"

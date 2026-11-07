@@ -40,6 +40,12 @@ export const FEATURES: FeatureNote[] = [
     body: "On someone else's page, the header shows how many of their cards you want, and how many of their wishes you can offer.",
     image: "/features/profile-overlap.svg",
   },
+  {
+    id: "trade-notice",
+    title: "New matches",
+    body: "The Trades tab shows how many matches you have as soon as you arrive. It lights up when a match is new since you last opened it.",
+    image: "/features/trade-notice.svg",
+  },
 ];
 
 function newestFirst(notes: readonly FeatureNote[]): FeatureNote[] {
