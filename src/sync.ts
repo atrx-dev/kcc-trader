@@ -10,7 +10,7 @@ const REQUEST_BUDGET = 40;
 const LOCK_KEY = "catalog-sync-lock";
 const LOCK_MS = 90_000;
 const POOL = 6;
-const SYNC_EVERY_MS = 20 * 60 * 60 * 1000;
+const SYNC_EVERY_MS = 12 * 60 * 60 * 1000;
 
 export interface SyncEnv {
   CARDS: KVNamespace;
