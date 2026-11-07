@@ -587,23 +587,25 @@ export function App() {
         const priority = new Set(match.priority ?? []);
         const theyHave = priorityFirst(cardsInCatalogOrder(match.theyHave, byKey), priority);
         const theyWant = priorityFirst(cardsInCatalogOrder(match.theyWant, byKey), priority);
-        return theyHave.length > 0 && theyWant.length > 0
-          ? [{ trader: match.trader, theyHave, theyWant, priority }]
-          : [];
+        return theyHave.length > 0 || theyWant.length > 0 ? [{ trader: match.trader, theyHave, theyWant, priority }] : [];
       }),
     [trades.matches, byKey],
   );
+  const mutualMatches = useMemo(
+    () => tradeMatches.filter((match) => match.theyHave.length > 0 && match.theyWant.length > 0),
+    [tradeMatches],
+  );
   useEffect(() => {
     if (!user || page !== "trades" || trades.status !== "ready" || !catalog) return;
-    const next = tradeMatches.map(matchSignature);
+    const next = mutualMatches.map(matchSignature);
     setSeenTrades((current) => {
       if (current.size === next.length && next.every((item) => current.has(item))) return current;
       window.localStorage.setItem(seenTradesKey(user.id), JSON.stringify(next));
       return new Set(next);
     });
-  }, [user?.id, page, trades.status, catalog, tradeMatches]);
-  if (trades.status === "ready" && catalog) counts.trades = tradeMatches.length;
-  const tradeAttention = page !== "trades" && tradeMatches.some((match) => !seenTrades.has(matchSignature(match)));
+  }, [user?.id, page, trades.status, catalog, mutualMatches]);
+  if (trades.status === "ready" && catalog) counts.trades = mutualMatches.length;
+  const tradeAttention = page !== "trades" && mutualMatches.some((match) => !seenTrades.has(matchSignature(match)));
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -714,7 +716,9 @@ export function App() {
             loading={trades.status === "loading" || trades.status === "idle" || !catalog}
             failed={trades.status === "error"}
             matches={tradeMatches}
-            needsBothLists={lists.forTrade.length === 0 || lists.wishlist.length === 0}
+            needsBothLists={lists.forTrade.length === 0 && lists.wishlist.length === 0}
+            wishlistEmpty={lists.wishlist.length === 0}
+            forTradeEmpty={lists.forTrade.length === 0}
             onRetry={() => setTradesVersion((version) => version + 1)}
             onOpen={openPage}
             accepting={lists.accepting !== false}

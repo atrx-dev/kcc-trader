@@ -46,6 +46,12 @@ export const FEATURES: FeatureNote[] = [
     body: "The Trades tab shows how many matches you have as soon as you arrive. It lights up when a match is new since you last opened it.",
     image: "/features/trade-notice.svg",
   },
+  {
+    id: "trade-views",
+    title: "You want, they want",
+    body: "On Trades, switch to who has a card on your Wishlist, or who wants a card you're offering. People who are already a match stay under Matches.",
+    image: "/features/trade-views.svg",
+  },
 ];
 
 function newestFirst(notes: readonly FeatureNote[]): FeatureNote[] {

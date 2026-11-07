@@ -45,9 +45,7 @@ export async function findTrades(env: ListEnv, userId: string): Promise<TradeMat
     const wanted = new Set(match.priority);
     return match.theyHave.reduce((count, key) => count + (wanted.has(key) ? 1 : 0), 0);
   };
-  return [...byTrader.values()]
-    .filter((match) => match.theyHave.length > 0 && match.theyWant.length > 0)
-    .sort(
+  return [...byTrader.values()].sort(
       (a, b) =>
         score(b) - score(a) ||
         priorityHits(b) - priorityHits(a) ||

@@ -93,8 +93,9 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
       <Article id="trades" title="Finding a trade">
         <p>
           A match is a trader who has a card on your Wishlist and wants a card on your For trade list. Both lists need
-          at least one card. The Trades tab shows how many matches you have, and lights up when one is new since you
-          last opened it.
+          at least one card. You want lists other traders who have a Wishlist card. They want lists other traders who
+          want a card you are offering. The Trades tab counts matches, and lights up when one is new since you last
+          opened it.
         </p>
         <p>
           <strong className="font-semibold text-white">Accepting trades</strong> is on by default. Turning it off hides

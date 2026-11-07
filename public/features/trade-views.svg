@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a2148"/>
+      <stop offset="1" stop-color="#221b3c"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="220" fill="url(#bg)"/>
+  <rect x="70" y="78" width="500" height="64" rx="32" fill="#151223" stroke="#fff" stroke-opacity="0.1"/>
+  <rect x="240" y="86" width="160" height="48" rx="24" fill="#f3d58f"/>
+  <g fill="none" stroke="#6ee7b7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="translate(108 102) scale(0.67)">
+    <path d="m11 17 2 2a1 1 0 1 0 3-3"/>
+    <path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/>
+    <path d="m21 3 1 11h-2"/>
+    <path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/>
+    <path d="M3 4h8"/>
+  </g>
+  <text x="132" y="110" fill="#fff" fill-opacity="0.7" font-family="Segoe UI, sans-serif" font-size="15" font-weight="600" dominant-baseline="central">Matches</text>
+  <text x="204" y="110" fill="#fff" fill-opacity="0.45" font-family="Segoe UI, sans-serif" font-size="15" font-weight="600" dominant-baseline="central">3</text>
+  <g fill="none" stroke="#1b1509" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="translate(268 102) scale(0.67)">
+    <path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"/>
+  </g>
+  <text x="292" y="110" fill="#1b1509" font-family="Segoe UI, sans-serif" font-size="15" font-weight="600" dominant-baseline="central">You want</text>
+  <text x="370" y="110" fill="#1b1509" fill-opacity="0.7" font-family="Segoe UI, sans-serif" font-size="15" font-weight="600" dominant-baseline="central">8</text>
+  <g fill="none" stroke="#7dd3fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="translate(430 102) scale(0.67)">
+    <path d="M8 3 4 7l4 4"/>
+    <path d="M4 7h16"/>
+    <path d="m16 21 4-4-4-4"/>
+    <path d="M20 17H4"/>
+  </g>
+  <text x="454" y="110" fill="#fff" fill-opacity="0.7" font-family="Segoe UI, sans-serif" font-size="15" font-weight="600" dominant-baseline="central">They want</text>
+  <text x="538" y="110" fill="#fff" fill-opacity="0.45" font-family="Segoe UI, sans-serif" font-size="15" font-weight="600" dominant-baseline="central">5</text>
+</svg>

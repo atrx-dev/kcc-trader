@@ -107,12 +107,78 @@ export function TraderMatch({
           </a>
         </Button>
       </header>
-      <div className="grid gap-3 md:grid-cols-2">
-        <MatchCards title="They have, you want" cards={theyHave} tone="bg-rose-300" owned={owned} priority={priority} />
-        <MatchCards title="You have, they want" cards={theyWant} tone="bg-sky-300" owned={owned} priority={priority} />
+      <div className={cn("grid gap-3", theyHave.length > 0 && theyWant.length > 0 && "md:grid-cols-2")}>
+        {theyHave.length > 0 ? (
+          <MatchCards title="They have, you want" cards={theyHave} tone="bg-rose-300" owned={owned} priority={priority} />
+        ) : null}
+        {theyWant.length > 0 ? (
+          <MatchCards title="You have, they want" cards={theyWant} tone="bg-sky-300" owned={owned} priority={priority} />
+        ) : null}
       </div>
     </article>
   );
+}
+
+type TradeView = "matches" | "you-want" | "they-want";
+
+const VIEWS: { id: TradeView; label: string; icon: typeof Handshake; tone: string; blurb: string }[] = [
+  {
+    id: "matches",
+    label: "Matches",
+    icon: Handshake,
+    tone: "text-emerald-300",
+    blurb: "Traders who have cards you want and want cards you have.",
+  },
+  {
+    id: "you-want",
+    label: "You want",
+    icon: Heart,
+    tone: "text-rose-300",
+    blurb: "Traders who have a card on your Wishlist, and don't want one of yours yet.",
+  },
+  {
+    id: "they-want",
+    label: "They want",
+    icon: ArrowLeftRight,
+    tone: "text-sky-300",
+    blurb: "Traders who want a card you're offering, and don't have one you want yet.",
+  },
+];
+
+function inView(match: ResolvedMatch, view: TradeView): boolean {
+  const theyHave = match.theyHave.length > 0;
+  const theyWant = match.theyWant.length > 0;
+  if (view === "matches") return theyHave && theyWant;
+  if (view === "you-want") return theyHave && !theyWant;
+  return theyWant && !theyHave;
+}
+
+function emptyTitle(view: TradeView): string {
+  if (view === "you-want") return "Nobody has a card you want";
+  if (view === "they-want") return "Nobody wants a card you have";
+  return "No matches yet";
+}
+
+function emptyBody(view: TradeView, wishlistEmpty: boolean, forTradeEmpty: boolean): string {
+  if (view === "you-want" && wishlistEmpty) return "Add cards to your Wishlist to see who has them for trade.";
+  if (view === "they-want" && forTradeEmpty) return "Add cards to For trade to see who wants them.";
+  if (view === "you-want") return "No one who is accepting trades has a card on your Wishlist right now.";
+  if (view === "they-want") return "No one who is accepting trades wants a card you're offering right now.";
+  return "Nobody has a card you want while also wanting one of yours. Adding more cards to your Wishlist and For trade list makes a match more likely.";
+}
+
+function compareView(view: TradeView) {
+  return (a: ResolvedMatch, b: ResolvedMatch) => {
+    const cards = (match: ResolvedMatch) => (view === "they-want" ? match.theyWant : match.theyHave);
+    const aCards = cards(a);
+    const bCards = cards(b);
+    const priority = (match: ResolvedMatch, side: Card[]) => side.filter((card) => match.priority.has(cardKey(card))).length;
+    return (
+      bCards.length - aCards.length ||
+      priority(b, bCards) - priority(a, aCards) ||
+      a.trader.name.localeCompare(b.trader.name)
+    );
+  };
 }
 
 export function TradesPage({
@@ -121,6 +187,8 @@ export function TradesPage({
   failed,
   matches,
   needsBothLists,
+  wishlistEmpty,
+  forTradeEmpty,
   onRetry,
   onOpen,
   accepting,
@@ -132,10 +200,24 @@ export function TradesPage({
   failed: boolean;
   matches: ResolvedMatch[];
   needsBothLists: boolean;
+  wishlistEmpty: boolean;
+  forTradeEmpty: boolean;
   onRetry: () => void;
   onOpen: (page: Page, href: string) => void;
   owned: OwnedState;
 }) {
+  const [view, setView] = useState<TradeView>("matches");
+  const counts: Record<TradeView, number> = { matches: 0, "you-want": 0, "they-want": 0 };
+  for (const match of matches) {
+    if (inView(match, "matches")) counts.matches += 1;
+    else if (inView(match, "you-want")) counts["you-want"] += 1;
+    else if (inView(match, "they-want")) counts["they-want"] += 1;
+  }
+  const shown = matches.filter((match) => inView(match, view));
+  if (view !== "matches") shown.sort(compareView(view));
+  const blurb = VIEWS.find((item) => item.id === view)?.blurb ?? "";
+  const ready = Boolean(user) && !loading && !failed && !needsBothLists;
+
   return (
     <>
       <section className="flex items-center gap-4 rounded-[1.75rem] border border-white/10 bg-[radial-gradient(110%_130%_at_0%_0%,rgba(110,231,183,0.18),transparent_55%),linear-gradient(160deg,#18242a,#141224)] px-5 py-4 md:px-8 md:py-5">
@@ -144,15 +226,41 @@ export function TradesPage({
         </span>
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-2xl leading-tight font-extrabold tracking-tight md:text-3xl">Trades</h1>
-          <p className="text-sm text-white/65">Traders who have cards you want and want cards you have.</p>
+          <p className="text-sm text-white/65">{blurb}</p>
         </div>
-        {user && !loading && !failed ? (
+        {ready ? (
           <div className="shrink-0 text-right">
-            <p className="font-display text-3xl leading-none font-extrabold tabular-nums">{matches.length}</p>
-            <p className="mt-1 text-xs text-white/60">{matches.length === 1 ? "trader" : "traders"}</p>
+            <p className="font-display text-3xl leading-none font-extrabold tabular-nums">{counts[view]}</p>
+            <p className="mt-1 text-xs text-white/60">{counts[view] === 1 ? "trader" : "traders"}</p>
           </div>
         ) : null}
       </section>
+
+      {ready ? (
+        <div role="tablist" aria-label="Trade overlaps" className="flex gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1">
+          {VIEWS.map((item) => {
+            const active = view === item.id;
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setView(item.id)}
+                className={cn(
+                  "flex h-9 min-w-0 flex-1 items-center justify-center gap-2 rounded-full px-2 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  active ? "bg-[#f3d58f] text-[#1b1509]" : "text-white/70 hover:bg-white/[0.07] hover:text-white",
+                )}
+              >
+                <Icon className={cn("size-4 shrink-0", active ? "text-[#1b1509]" : item.tone)} />
+                <span className="truncate">{item.label}</span>
+                <span className={cn("tabular-nums", active ? "text-[#1b1509]/70" : "text-white/45")}>{counts[item.id]}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {user && !accepting ? (
         <p className="rounded-2xl border border-amber-200/25 bg-amber-200/[0.07] px-4 py-3 text-sm text-amber-100/90">
@@ -193,7 +301,7 @@ export function TradesPage({
             </div>
           }
         >
-          Trades go both ways, so add cards you want to your Wishlist and cards you can give away to For trade.
+          Add cards you want to your Wishlist, or cards you can give away to For trade.
         </EmptyState>
       ) : failed ? (
         <EmptyState
@@ -214,14 +322,13 @@ export function TradesPage({
             <Skeleton key={index} className="h-64 rounded-3xl bg-white/[0.05]" />
           ))}
         </div>
-      ) : matches.length === 0 ? (
-        <EmptyState icon={Handshake} title="No matches yet">
-          Nobody has a card you want while also wanting one of yours. Adding more cards to your Wishlist and For trade list
-          makes a match more likely.
+      ) : shown.length === 0 ? (
+        <EmptyState icon={view === "you-want" ? Heart : view === "they-want" ? ArrowLeftRight : Handshake} title={emptyTitle(view)}>
+          {emptyBody(view, wishlistEmpty, forTradeEmpty)}
         </EmptyState>
       ) : (
         <div className="grid gap-4">
-          {matches.map((match) => (
+          {shown.map((match) => (
             <TraderMatch key={match.trader.id} match={match} owned={owned} onOpen={onOpen} />
           ))}
         </div>
