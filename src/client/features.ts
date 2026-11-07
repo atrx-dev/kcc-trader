@@ -22,6 +22,12 @@ export const FEATURES: FeatureNote[] = [
     image: "/features/profile-sections.svg",
     bleed: true,
   },
+  {
+    id: "new-cards",
+    title: "New cards",
+    body: "Cards added in the last 7 days wear a New badge. Sort the catalog by Name, or by Newest, to bring them up front.",
+    image: "/features/new-cards.svg",
+  },
 ];
 
 export function unseenFeatures(seenId: string | null): FeatureNote[] {

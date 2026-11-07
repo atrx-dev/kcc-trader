@@ -3,7 +3,7 @@ import { RotateCcw, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cardKey, type Card, type Catalog } from "../types.ts";
 import { VirtualGrid } from "./VirtualGrid.tsx";
-import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters } from "./model.ts";
+import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, byName, newestFirst, type CatalogSort, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters } from "./model.ts";
 import { CardFace } from "./components/cards.tsx";
 import { formatSyncedAt, Brand, NavTabs, AccountMenu, HelpButton } from "./components/header.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
@@ -29,6 +29,7 @@ const INITIAL_PAGE_FILTERS: Record<Page, Filters> = {
 
 export function App() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [catalogSort, setCatalogSort] = useState<CatalogSort>("rarity");
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [userLoaded, setUserLoaded] = useState(false);
@@ -496,7 +497,9 @@ export function App() {
   const listFilters =
     listName === "forTrade" && filters.owned !== "duplicates" ? { ...filters, owned: "all" as const } : filters;
   const catalogView = listName ? null : applyFilters(cards, filters, owned, needle);
-  const catalogCards = catalogView?.cards ?? [];
+  const filteredCatalog = catalogView?.cards ?? [];
+  const catalogCards =
+    catalogSort === "added" ? newestFirst(filteredCatalog) : catalogSort === "name" ? byName(filteredCatalog) : filteredCatalog;
   const listView = listName ? applyFilters(selected, listFilters, owned, "") : null;
   const listOptions = listName ? facetOptionsFor(selected) : null;
   const ownedReady = owned.status === "ready";
@@ -776,6 +779,12 @@ export function App() {
               total={cards.length}
               query={query}
               onClearQuery={() => setQuery("")}
+              sort={catalogSort}
+              onSort={(next) => {
+                if (next === catalogSort) return;
+                setCatalogSort(next);
+                window.scrollTo({ top: 0 });
+              }}
             />
 
             {!catalog && !error ? <GridSkeleton /> : null}

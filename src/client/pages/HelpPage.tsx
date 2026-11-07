@@ -106,7 +106,11 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
       </Article>
 
       <Article id="catalog" title="Browsing the catalog">
-        <p>Search covers the card name, variant, game, and developer. Rarity, type, game, and developer narrow the grid.</p>
+        <p>
+          Search covers the card name, variant, game, and developer. Rarity, type, game, and developer narrow the grid. A
+          card new to the catalog in the last 7 days is marked New. Name sorts the catalog alphabetically. Newest
+          sorts additions first, and cards from before that tracking started stay in rarity order after them.
+        </p>
         <p>
           Once your collection has synced, Owned and Not owned split the catalog by what you have. Duplicates shows SS
           and SSS cards you have more than one copy of. For trade only offers All and Duplicates, because every card

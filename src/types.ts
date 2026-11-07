@@ -13,6 +13,7 @@ export interface Card {
   border: string | null;
   image: string;
   hidden?: boolean;
+  addedAt?: string;
 }
 
 export interface Catalog {
@@ -22,4 +23,12 @@ export interface Catalog {
 
 export function cardKey(card: Pick<Card, "id" | "variantId" | "rank">): string {
   return `${card.id}:${card.variantId ?? ""}:${card.rank}`;
+}
+
+export const NEW_FOR_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function isNewCard(card: Pick<Card, "addedAt">, now = Date.now()): boolean {
+  if (!card.addedAt) return false;
+  const added = Date.parse(card.addedAt);
+  return Number.isFinite(added) && added <= now && now - added < NEW_FOR_MS;
 }

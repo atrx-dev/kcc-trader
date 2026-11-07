@@ -1,7 +1,7 @@
 import { type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Copy, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { type Card } from "../../types.ts";
+import { isNewCard, type Card } from "../../types.ts";
 import { frameUrl, namePlateStyle } from "../frame.ts";
 
 export const SSS_STARS = [
@@ -110,6 +110,19 @@ function PriorityToggle({ active, onClick }: { active: boolean; onClick: () => v
   );
 }
 
+function NewMark({ offset }: { offset: boolean }) {
+  return (
+    <span
+      className={cn(
+        "new-mark pointer-events-none absolute left-3 z-10 inline-flex items-center rounded-full bg-sky-200 px-1.5 py-1 text-[11px] leading-none font-bold text-sky-950 shadow-[0_2px_10px_rgba(0,0,0,0.5)]",
+        offset ? "top-10" : "top-3",
+      )}
+    >
+      New
+    </span>
+  );
+}
+
 function DuplicateMark({ count }: { count: number }) {
   return (
     <span
@@ -135,12 +148,13 @@ export function CardFace({
   onPriority?: () => void;
 }) {
   const holo = card.rank === "S" || card.rank === "SS" || card.rank === "SSS";
+  const fresh = isNewCard(card);
   const face = (
     <div
       className={holo ? "card framed-card foil" : "card framed-card"}
       data-rank={card.rank}
       data-sss-border={card.rank === "SSS" ? card.border || "starry" : undefined}
-      aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${priority ? ", priority" : ""}${copies > 1 ? `, ${copies} copies` : ""}`}
+      aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${fresh ? ", new" : ""}${priority ? ", priority" : ""}${copies > 1 ? `, ${copies} copies` : ""}`}
     >
       {card.image ? (
         <img className="card-artwork" src={card.image} alt="" decoding="async" />
@@ -160,6 +174,7 @@ export function CardFace({
       {holo ? <FoilCard card={card}>{face}</FoilCard> : face}
       {onPriority ? <PriorityToggle active={priority} onClick={onPriority} /> : priority ? <PriorityMark /> : null}
       {copies > 1 ? <DuplicateMark count={copies} /> : null}
+      {fresh ? <NewMark offset={copies > 1} /> : null}
     </div>
   );
 }

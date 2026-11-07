@@ -4,7 +4,7 @@ import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, 
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { type FacetId, type OwnedFilter, FACETS, type Filters, NO_FILTERS, OWNED_CHOICES } from "../model.ts";
+import { type CatalogSort, type FacetId, type OwnedFilter, FACETS, type Filters, NO_FILTERS, OWNED_CHOICES } from "../model.ts";
 
 export function SearchField({
   id,
@@ -174,6 +174,49 @@ export function OwnedToggle({
   );
 }
 
+const SORT_CHOICES: { value: CatalogSort; label: string }[] = [
+  { value: "rarity", label: "Rarity" },
+  { value: "name", label: "Name" },
+  { value: "added", label: "Newest" },
+];
+
+export function SortToggle({ value, onChange }: { value: CatalogSort; onChange: (value: CatalogSort) => void }) {
+  const current = SORT_CHOICES.find((choice) => choice.value === value) ?? SORT_CHOICES[0];
+  const custom = value !== "rarity";
+  return (
+    <Combobox
+      items={SORT_CHOICES.map((choice) => choice.label)}
+      value={current.label}
+      onValueChange={(next: string | null) => {
+        const choice = SORT_CHOICES.find((item) => item.label === next);
+        if (choice) onChange(choice.value);
+      }}
+    >
+      <ComboboxTrigger
+        aria-label={`Sort, ${current.label}`}
+        className={cn(
+          "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+          custom
+            ? "border-amber-200/40 bg-amber-200/[0.1] text-amber-50"
+            : "border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.08] hover:text-white",
+        )}
+      >
+        Sort
+        <span className={cn("max-w-36 truncate", custom ? "text-amber-100/75" : "text-white/55")}>{current.label}</span>
+      </ComboboxTrigger>
+      <ComboboxContent className="w-44">
+        <ComboboxList>
+          {(item: string) => (
+            <ComboboxItem key={item} value={item}>
+              {item}
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
+  );
+}
+
 export function FilterChip({ prefix, label, onRemove }: { prefix?: string; label: string; onRemove: () => void }) {
   return (
     <button
@@ -243,6 +286,8 @@ export function FilterBar({
   total,
   query,
   onClearQuery,
+  sort,
+  onSort,
   noun = "cards",
   showCount = true,
 }: {
@@ -256,6 +301,8 @@ export function FilterBar({
   total: number;
   query?: string;
   onClearQuery?: () => void;
+  sort?: CatalogSort;
+  onSort?: (sort: CatalogSort) => void;
   noun?: string;
   showCount?: boolean;
 }) {
@@ -290,38 +337,43 @@ export function FilterBar({
             onChange={(values) => setFacet(facet.id, values)}
           />
         ))}
-        {ownedControls ? (
+        {ownedControls || onSort ? (
           <div className="flex items-center gap-1 sm:ml-auto">
-            <OwnedToggle
-              value={filters.owned}
-              disabled={!ownedControls.ready}
-              choices={ownedChoices}
-              onChange={(value) => onChange({ ...filters, owned: value })}
-            />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span
-                  className={cn(
-                    "inline-flex rounded-full",
-                    ownedControls.syncDisabled && "cursor-not-allowed outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                  )}
-                  tabIndex={ownedControls.syncDisabled ? 0 : undefined}
-                  aria-label={ownedControls.syncDisabled ? ownedControls.syncHint : undefined}
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full text-white/70"
-                    aria-label="Sync collection"
-                    disabled={ownedControls.syncDisabled}
-                    onClick={ownedControls.onSync}
-                  >
-                    <RefreshCw className={cn(ownedControls.syncing && "animate-spin")} />
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{ownedControls.syncHint}</TooltipContent>
-            </Tooltip>
+            {sort && onSort ? <SortToggle value={sort} onChange={onSort} /> : null}
+            {ownedControls ? (
+              <>
+                <OwnedToggle
+                  value={filters.owned}
+                  disabled={!ownedControls.ready}
+                  choices={ownedChoices}
+                  onChange={(value) => onChange({ ...filters, owned: value })}
+                />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className={cn(
+                        "inline-flex rounded-full",
+                        ownedControls.syncDisabled && "cursor-not-allowed outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                      )}
+                      tabIndex={ownedControls.syncDisabled ? 0 : undefined}
+                      aria-label={ownedControls.syncDisabled ? ownedControls.syncHint : undefined}
+                    >
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full text-white/70"
+                        aria-label="Sync collection"
+                        disabled={ownedControls.syncDisabled}
+                        onClick={ownedControls.onSync}
+                      >
+                        <RefreshCw className={cn(ownedControls.syncing && "animate-spin")} />
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{ownedControls.syncHint}</TooltipContent>
+                </Tooltip>
+              </>
+            ) : null}
           </div>
         ) : null}
       </div>

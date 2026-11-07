@@ -267,6 +267,29 @@ export function isOwned(card: Card, owned: OwnedState): boolean {
   return false;
 }
 
+export type CatalogSort = "rarity" | "added" | "name";
+
+export function byName(cards: readonly Card[]): Card[] {
+  return [...cards].sort(
+    (a, b) =>
+      a.name.localeCompare(b.name) ||
+      (a.variantName ?? "").localeCompare(b.variantName ?? "") ||
+      RANK_ORDER.indexOf(b.rank) - RANK_ORDER.indexOf(a.rank),
+  );
+}
+
+export function newestFirst(cards: readonly Card[]): Card[] {
+  return [...cards].sort((a, b) => {
+    const aTime = a.addedAt ? Date.parse(a.addedAt) : Number.NaN;
+    const bTime = b.addedAt ? Date.parse(b.addedAt) : Number.NaN;
+    const aKnown = Number.isFinite(aTime);
+    const bKnown = Number.isFinite(bTime);
+    if (aKnown && bKnown && aTime !== bTime) return bTime - aTime;
+    if (aKnown !== bKnown) return aKnown ? -1 : 1;
+    return 0;
+  });
+}
+
 export function cardsInCatalogOrder(keys: Iterable<string>, byKey: Map<string, Card>): Card[] {
   const wanted = new Set(keys);
   return [...byKey.values()].filter((card) => wanted.has(cardKey(card)));

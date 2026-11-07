@@ -203,7 +203,11 @@ export async function discoverHiddenCards(env: SyncEnv, characterIds: Iterable<s
   const hiddenIds = new Set(await readHiddenIds(env));
   for (const character of found) hiddenIds.add(character.id);
   await env.CARDS.put(HIDDEN_KEY, JSON.stringify([...hiddenIds]));
-  await env.CARDS.put("catalog", JSON.stringify({ ...catalog, cards: [...catalog.cards, ...added] }));
+  const at = new Date().toISOString();
+  await env.CARDS.put(
+    "catalog",
+    JSON.stringify({ ...catalog, cards: [...catalog.cards, ...added.map((card) => ({ ...card, addedAt: at }))] }),
+  );
   return true;
 }
 
@@ -280,8 +284,22 @@ export async function addSsArtwork(env: SyncEnv, cards: Card[]): Promise<boolean
   const known = new Set(catalog.cards.map((card) => cardKey(card)));
   const extra = [...byKey.values()].filter((card) => !known.has(cardKey(card)));
   if (extra.length === 0) return false;
-  await env.CARDS.put("catalog", JSON.stringify({ ...catalog, cards: [...catalog.cards, ...extra] }));
+  const at = new Date().toISOString();
+  const extraStamped = extra.map((card) => ({ ...card, addedAt: card.addedAt ?? at }));
+  await env.CARDS.put("catalog", JSON.stringify({ ...catalog, cards: [...catalog.cards, ...extraStamped] }));
   return true;
+}
+
+function rememberAddedAt(previous: Card[], cards: Card[], at: string): Card[] {
+  const known = new Map(previous.map((card) => [cardKey(card), card.addedAt]));
+  return cards.map((card) => {
+    const key = cardKey(card);
+    if (known.has(key)) {
+      const addedAt = known.get(key);
+      return addedAt ? { ...card, addedAt } : card;
+    }
+    return { ...card, addedAt: at };
+  });
 }
 
 function finishRun(run: SyncRun, artwork: Card[]): Catalog {
@@ -356,7 +374,11 @@ export async function stepCatalogSync(env: SyncEnv, force = false): Promise<Sync
 
   const seen = new Set([...run.cards, ...run.eventCards, ...(run.hidden?.cards ?? [])].map((card) => cardKey(card)));
   const artwork = (await readSsArtwork(env)).filter((card) => !seen.has(cardKey(card)));
+  const previous = await readCatalog(env);
   const catalog = finishRun(run, artwork);
+  if (previous.syncedAt && catalog.syncedAt) {
+    catalog.cards = rememberAddedAt(previous.cards, catalog.cards, catalog.syncedAt);
+  }
   await env.CARDS.put("catalog", JSON.stringify(catalog));
   if (run.hidden.keep.length !== run.hidden.stored) await env.CARDS.put(HIDDEN_KEY, JSON.stringify(run.hidden.keep));
   await env.CARDS.put(SYNC_STATE_KEY, JSON.stringify({ finishedAt: catalog.syncedAt }));
