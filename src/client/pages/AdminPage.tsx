@@ -82,10 +82,16 @@ export function AdminPage() {
     setError(null);
     try {
       let force = restart;
+      let owner = "";
       for (;;) {
-        const response = await fetch(force ? "/api/admin/catalog?restart" : "/api/admin/catalog", { method: "POST" });
-        const body = (await response.json()) as CatalogStatus & { error?: string; syncedAt?: string; count?: number };
+        const params = new URLSearchParams();
+        if (force) params.set("restart", "");
+        if (owner) params.set("owner", owner);
+        const query = params.toString();
+        const response = await fetch(query ? `/api/admin/catalog?${query}` : "/api/admin/catalog", { method: "POST" });
+        const body = (await response.json()) as CatalogStatus & { error?: string; syncedAt?: string; count?: number; owner?: string };
         if (!response.ok) throw new Error(body.error ?? "Catalog sync failed");
+        if (body.owner) owner = body.owner;
         if (!alive.current) break;
         if (body.status === "done") {
           setCatalog({

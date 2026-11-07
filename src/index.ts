@@ -329,7 +329,7 @@ export default {
       const gate = await requireAdmin(request, env);
       if (gate instanceof Response) return gate;
       try {
-        return Response.json(await stepCatalogSync(env, url.searchParams.has("restart")));
+        return Response.json(await stepCatalogSync(env, url.searchParams.has("restart"), url.searchParams.get("owner") ?? ""));
       } catch (error) {
         const message = error instanceof Error ? error.message : "Sync failed";
         return Response.json({ error: message }, { status: 502 });
@@ -352,7 +352,7 @@ export default {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
       }
       try {
-        return Response.json(await stepCatalogSync(env, url.searchParams.has("restart")));
+        return Response.json(await stepCatalogSync(env, url.searchParams.has("restart"), url.searchParams.get("owner") ?? ""));
       } catch (error) {
         const message = error instanceof Error ? error.message : "Sync failed";
         return Response.json({ error: message }, { status: 502 });

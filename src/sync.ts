@@ -9,6 +9,8 @@ const SYNC_STATE_KEY = "catalog-sync";
 const REQUEST_BUDGET = 40;
 const LOCK_KEY = "catalog-sync-lock";
 const LOCK_MS = 90_000;
+const LOCK_TTL_SECONDS = 120;
+const WRITE_GAP_MS = 1_100;
 const POOL = 6;
 const SYNC_EVERY_MS = 12 * 60 * 60 * 1000;
 
@@ -202,9 +204,9 @@ export async function discoverHiddenCards(env: SyncEnv, characterIds: Iterable<s
 
   const hiddenIds = new Set(await readHiddenIds(env));
   for (const character of found) hiddenIds.add(character.id);
-  await env.CARDS.put(HIDDEN_KEY, JSON.stringify([...hiddenIds]));
+  await writeKey(env, HIDDEN_KEY, JSON.stringify([...hiddenIds]));
   const at = new Date().toISOString();
-  await env.CARDS.put(
+  await writeKey(env,
     "catalog",
     JSON.stringify({ ...catalog, cards: [...catalog.cards, ...added.map((card) => ({ ...card, addedAt: at }))] }),
   );
@@ -224,8 +226,72 @@ type SyncState = { finishedAt: string } | SyncRun;
 
 export type SyncProgress =
   | { status: "idle"; finishedAt: string }
-  | { status: "running"; remaining: number; locked?: boolean }
+  | { status: "running"; remaining: number; locked?: boolean; owner?: string }
   | { status: "done"; syncedAt: string; count: number };
+
+interface SyncLock {
+  owner: string;
+  at: number;
+}
+
+function readLock(raw: string | null): SyncLock | null {
+  if (!raw) return null;
+  if (raw.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(raw) as { owner?: unknown; at?: unknown };
+      if (typeof parsed.owner === "string" && typeof parsed.at === "number") return { owner: parsed.owner, at: parsed.at };
+    } catch {
+      return null;
+    }
+    return null;
+  }
+  const at = Number(raw);
+  return Number.isFinite(at) ? { owner: "", at } : null;
+}
+
+function rateLimited(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /too many requests/i.test(message) || /\b429\b/.test(message);
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function writeKey(env: SyncEnv, key: string, value: string, options?: KVNamespacePutOptions): Promise<void> {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      await (options ? env.CARDS.put(key, value, options) : env.CARDS.put(key, value));
+      return;
+    } catch (error) {
+      if (attempt === 3 || !rateLimited(error)) throw error;
+      await wait(WRITE_GAP_MS);
+    }
+  }
+}
+
+async function removeKey(env: SyncEnv, key: string): Promise<void> {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      await env.CARDS.delete(key);
+      return;
+    } catch (error) {
+      if (attempt === 3 || !rateLimited(error)) throw error;
+      await wait(WRITE_GAP_MS);
+    }
+  }
+}
+
+async function claimLock(env: SyncEnv, owner: string): Promise<{ owner: string } | { busy: true }> {
+  const current = readLock(await env.CARDS.get(LOCK_KEY));
+  const held = current !== null && Date.now() - current.at < LOCK_MS;
+  if (held && current.owner !== owner) return { busy: true };
+  const next = owner || crypto.randomUUID();
+  if (!current || current.owner !== next || Date.now() - current.at >= WRITE_GAP_MS) {
+    await writeKey(env, LOCK_KEY, JSON.stringify({ owner: next, at: Date.now() }), { expirationTtl: LOCK_TTL_SECONDS });
+  }
+  return { owner: next };
+}
 
 export interface CatalogSyncStatus {
   status: "idle" | "running";
@@ -285,7 +351,7 @@ export async function addSsArtwork(env: SyncEnv, cards: Card[]): Promise<boolean
     added = true;
   }
   if (!added) return false;
-  await env.CARDS.put(SS_ARTWORK_KEY, JSON.stringify([...byKey.values()]));
+  await writeKey(env, SS_ARTWORK_KEY, JSON.stringify([...byKey.values()]));
   const catalog = await readCatalog(env);
   if (!catalog.syncedAt) return false;
   const known = new Set(catalog.cards.map((card) => cardKey(card)));
@@ -293,7 +359,7 @@ export async function addSsArtwork(env: SyncEnv, cards: Card[]): Promise<boolean
   if (extra.length === 0) return false;
   const at = new Date().toISOString();
   const extraStamped = extra.map((card) => ({ ...card, addedAt: card.addedAt ?? at }));
-  await env.CARDS.put("catalog", JSON.stringify({ ...catalog, cards: [...catalog.cards, ...extraStamped] }));
+  await writeKey(env, "catalog", JSON.stringify({ ...catalog, cards: [...catalog.cards, ...extraStamped] }));
   return true;
 }
 
@@ -328,16 +394,15 @@ function remainingOf(state: SyncState | null): number {
   return state.pending.length + (state.hidden?.pending.length ?? 0);
 }
 
-export async function stepCatalogSync(env: SyncEnv, force = false): Promise<SyncProgress> {
+export async function stepCatalogSync(env: SyncEnv, force = false, owner = ""): Promise<SyncProgress> {
   const state = await env.CARDS.get<SyncState>(SYNC_STATE_KEY, "json");
   if (!force && state && "finishedAt" in state && Date.now() - Date.parse(state.finishedAt) < SYNC_EVERY_MS) {
     return { status: "idle", finishedAt: state.finishedAt };
   }
-  const lock = await env.CARDS.get(LOCK_KEY);
-  if (lock && Date.now() - Number(lock) < LOCK_MS) {
-    return { status: "running", remaining: remainingOf(state), ...(force ? { locked: true } : {}) };
+  const claim = await claimLock(env, owner);
+  if ("busy" in claim) {
+    return { status: "running", remaining: remainingOf(state), locked: true };
   }
-  await env.CARDS.put(LOCK_KEY, String(Date.now()), { expirationTtl: 60 });
   const run = force || !state || "finishedAt" in state ? freshRun() : state;
   let budget = REQUEST_BUDGET;
 
@@ -370,15 +435,14 @@ export async function stepCatalogSync(env: SyncEnv, force = false): Promise<Sync
       run.hidden.pending = run.hidden.pending.slice(batch.length);
     }
   } catch (error) {
-    await env.CARDS.put(SYNC_STATE_KEY, JSON.stringify(run));
-    await env.CARDS.delete(LOCK_KEY);
+    await writeKey(env, SYNC_STATE_KEY, JSON.stringify(run));
+    await removeKey(env, LOCK_KEY);
     throw error;
   }
 
   if (run.listing || run.pending.length > 0 || !run.hidden || run.hidden.pending.length > 0) {
-    await env.CARDS.put(SYNC_STATE_KEY, JSON.stringify(run));
-    await env.CARDS.delete(LOCK_KEY);
-    return { status: "running", remaining: run.pending.length + (run.hidden?.pending.length ?? 0) };
+    await writeKey(env, SYNC_STATE_KEY, JSON.stringify(run));
+    return { status: "running", remaining: run.pending.length + (run.hidden?.pending.length ?? 0), owner: claim.owner };
   }
 
   const seen = new Set([...run.cards, ...run.eventCards, ...(run.hidden?.cards ?? [])].map((card) => cardKey(card)));
@@ -388,10 +452,10 @@ export async function stepCatalogSync(env: SyncEnv, force = false): Promise<Sync
   if (previous.syncedAt && catalog.syncedAt) {
     catalog.cards = rememberAddedAt(previous.cards, catalog.cards, catalog.syncedAt);
   }
-  await env.CARDS.put("catalog", JSON.stringify(catalog));
-  if (run.hidden.keep.length !== run.hidden.stored) await env.CARDS.put(HIDDEN_KEY, JSON.stringify(run.hidden.keep));
-  await env.CARDS.put(SYNC_STATE_KEY, JSON.stringify({ finishedAt: catalog.syncedAt }));
-  await env.CARDS.delete(LOCK_KEY);
+  await writeKey(env, "catalog", JSON.stringify(catalog));
+  if (run.hidden.keep.length !== run.hidden.stored) await writeKey(env, HIDDEN_KEY, JSON.stringify(run.hidden.keep));
+  await writeKey(env, SYNC_STATE_KEY, JSON.stringify({ finishedAt: catalog.syncedAt }));
+  await removeKey(env, LOCK_KEY);
   return { status: "done", syncedAt: catalog.syncedAt!, count: catalog.cards.length };
 }
 
