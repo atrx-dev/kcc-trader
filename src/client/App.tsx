@@ -3,14 +3,15 @@ import { RotateCcw, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cardKey, type Card, type Catalog } from "../types.ts";
 import { VirtualGrid } from "./VirtualGrid.tsx";
-import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, byName, newestFirst, mostDesired, type CatalogSort, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, tradeViewFromPath, tradeViewHref, type TradeView, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters, seenTradesKey, tradeSignature, readSeenTrades } from "./model.ts";
+import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, byName, newestFirst, mostDesired, type CatalogSort, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, tradeViewFromPath, tradeViewHref, type TradeView, leaderboardByFromPath, leaderboardHref, type LeaderboardBy, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters, seenTradesKey, tradeSignature, readSeenTrades } from "./model.ts";
 import { CardFace } from "./components/cards.tsx";
-import { formatSyncedAt, Brand, NavTabs, AccountMenu, HelpButton, TraderSearch } from "./components/header.tsx";
+import { formatSyncedAt, Brand, NavTabs, AccountMenu, HelpButton, LeaderboardButton, TraderSearch } from "./components/header.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
 import { SettingsSheet } from "./components/SettingsSheet.tsx";
 import { EmptyState, Banner, GridSkeleton, Showcase, StatPill, WelcomeDialog } from "./components/common.tsx";
 import { ProfilePage } from "./pages/ProfilePage.tsx";
 import { TradesPage } from "./pages/TradesPage.tsx";
+import { LeaderboardPage } from "./pages/LeaderboardPage.tsx";
 import { ListPage } from "./pages/ListPage.tsx";
 import { HelpPage } from "./pages/HelpPage.tsx";
 import { FeatureDialog } from "./components/FeatureDialog.tsx";
@@ -52,6 +53,7 @@ export function App() {
   const [replayFeatures, setReplayFeatures] = useState(false);
   const [page, setPage] = useState<Page>(INITIAL_PAGE);
   const [tradeView, setTradeView] = useState<TradeView>(() => tradeViewFromPath(window.location.pathname));
+  const [leaderboardBy, setLeaderboardBy] = useState<LeaderboardBy>(() => leaderboardByFromPath(window.location.pathname));
   const [profileId, setProfileId] = useState(() => profileIdFromPath(window.location.pathname));
   const [query, setQuery] = useState(INITIAL_URL_STATE.query);
   const [pageFilters, setPageFilters] = useState<Record<Page, Filters>>(INITIAL_PAGE_FILTERS);
@@ -125,6 +127,7 @@ export function App() {
       const state = readUrlState(window.location.search);
       setPage(next);
       setTradeView(tradeViewFromPath(window.location.pathname));
+      setLeaderboardBy(leaderboardByFromPath(window.location.pathname));
       setProfileId(profileIdFromPath(window.location.pathname));
       setQuery(state.query);
       setPageFilters((current) => ({ ...current, [next]: state.filters }));
@@ -268,11 +271,20 @@ export function App() {
     }
     setPage(next);
     setTradeView(tradeViewFromPath(href));
+    setLeaderboardBy(leaderboardByFromPath(href));
     setProfileId(profileIdFromPath(href));
     setQuery("");
     setListError(null);
     setNotice(null);
     window.scrollTo({ top: 0 });
+  }
+
+  function openLeaderboard(next: LeaderboardBy) {
+    const href = leaderboardHref(next);
+    if (window.location.pathname !== href) {
+      window.history.pushState(null, "", `${href}${window.location.search}${window.location.hash}`);
+    }
+    setLeaderboardBy(next);
   }
 
   function openTradeView(next: TradeView) {
@@ -611,6 +623,7 @@ export function App() {
     trades: null,
     profile: null,
     help: null,
+    leaderboard: null,
   };
   const tradeMatches = useMemo(
     () =>
@@ -660,7 +673,8 @@ export function App() {
           <NavTabs page={page} counts={counts} attention={{ trades: tradeAttention }} onOpen={openPage} className="mx-auto hidden xl:flex" />
           <div className="ml-auto flex items-center gap-1 xl:ml-0">
             <TraderSearch onOpen={openPage} />
-            <HelpButton onOpen={openPage} />
+            <LeaderboardButton active={page === "leaderboard"} onOpen={openPage} />
+            <HelpButton active={page === "help"} onOpen={openPage} />
             <SettingsSheet
               settings={settings}
               onChange={updateSettings}
@@ -739,6 +753,13 @@ export function App() {
 
         {page === "help" ? (
           <HelpPage onOpen={openPage} />
+        ) : page === "leaderboard" ? (
+          <LeaderboardPage
+            by={leaderboardBy}
+            onBy={openLeaderboard}
+            userId={user?.id ?? null}
+            onOpenProfile={(id) => openPage("profile", `/u/${id}`)}
+          />
         ) : page === "profile" && profileId ? (
           <ProfilePage
             key={profileId}
@@ -823,7 +844,19 @@ export function App() {
                     <StatPill value={heroStats.sss} label="SSS" />
                     <StatPill value={heroStats.developers} label="developers" />
                     <StatPill value={heroStats.games} label="games" />
-                    {traderCount !== null ? <StatPill value={traderCount} label="traders" /> : null}
+                    {traderCount !== null ? (
+                      <a
+                        href="/leaderboard"
+                        aria-label={`${traderCount.toLocaleString()} traders, open the leaderboard`}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          openPage("leaderboard", "/leaderboard");
+                        }}
+                        className="rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        <StatPill value={traderCount} label="traders" className="transition-colors hover:bg-white/10" />
+                      </a>
+                    ) : null}
                   </dl>
                 ) : (
                   <p className="mt-1.5 text-sm text-white/60">Loading the catalog…</p>

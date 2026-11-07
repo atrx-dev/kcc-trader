@@ -16,6 +16,7 @@ export interface SessionProfile {
   publicCollection: boolean;
   cards: number;
   sss: number;
+  collectionValue?: number;
 }
 
 export interface SessionUser {
@@ -40,7 +41,7 @@ interface KccProfileResponse {
     discordUsername?: string;
     level?: number;
     publicCollection?: boolean;
-    stats?: { cards?: number; sss?: number };
+    stats?: { cards?: number; sss?: number; collectionValue?: number };
   };
 }
 
@@ -195,6 +196,7 @@ async function kccProfile(discordId: string): Promise<SessionProfile | null> {
     publicCollection: profile.publicCollection ?? false,
     cards: profile.stats?.cards ?? 0,
     sss: profile.stats?.sss ?? 0,
+    collectionValue: profile.stats?.collectionValue ?? 0,
   };
 }
 

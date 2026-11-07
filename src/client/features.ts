@@ -58,6 +58,12 @@ export const FEATURES: FeatureNote[] = [
     body: "Search the header for a display name, Discord username, or KCC name, and open that person's page.",
     image: "/features/find-trader.svg",
   },
+  {
+    id: "leaderboard",
+    title: "Leaderboard",
+    body: "The trophy in the header opens a leaderboard of public collections. It ranks by SSS cards, with collection value and level as the other orders.",
+    image: "/features/leaderboard.svg",
+  },
 ];
 
 function newestFirst(notes: readonly FeatureNote[]): FeatureNote[] {

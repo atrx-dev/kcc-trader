@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { CircleHelp, LogIn, LogOut, Search, Sparkles } from "lucide-react";
+import { CircleHelp, LogIn, LogOut, Search, Sparkles, Trophy } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -16,6 +16,7 @@ export function Brand({ onOpen }: { onOpen: (page: Page, href: string) => void }
   return (
     <a
       href="/"
+      aria-label="KCC Trader"
       className="flex shrink-0 items-center gap-2.5"
       onClick={(event) => {
         event.preventDefault();
@@ -25,7 +26,7 @@ export function Brand({ onOpen }: { onOpen: (page: Page, href: string) => void }
       <span className="grid size-9 place-items-center rounded-xl bg-[linear-gradient(135deg,#fde7b0,#f3c46f_45%,#f59cc0)] text-[#2a1a08] shadow-[0_8px_24px_-10px_rgba(245,156,192,0.9)]">
         <Sparkles className="size-[1.1rem]" strokeWidth={2.4} />
       </span>
-      <span className="font-display text-xl leading-none font-extrabold tracking-tight">
+      <span className="hidden font-display text-xl leading-none font-extrabold tracking-tight sm:inline">
         KCC <span className="text-amber-200">Trader</span>
       </span>
     </a>
@@ -257,14 +258,54 @@ export function TraderSearch({ onOpen }: { onOpen: (page: Page, href: string) =>
   );
 }
 
-export function HelpButton({ onOpen }: { onOpen: (page: Page, href: string) => void }) {
+export function LeaderboardButton({
+  active,
+  onOpen,
+}: {
+  active: boolean;
+  onOpen: (page: Page, href: string) => void;
+}) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button asChild variant="ghost" size="icon" className="rounded-full text-white/70">
+        <Button
+          asChild
+          variant="ghost"
+          size="icon"
+          className={cn("rounded-full", active ? "bg-white/10 text-white" : "text-white/70")}
+        >
+          <a
+            href="/leaderboard"
+            aria-label="Leaderboard"
+            aria-current={active ? "page" : undefined}
+            onClick={(event) => {
+              event.preventDefault();
+              onOpen("leaderboard", "/leaderboard");
+            }}
+          >
+            <Trophy />
+          </a>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Leaderboard</TooltipContent>
+    </Tooltip>
+  );
+}
+
+export function HelpButton({ active, onOpen }: { active: boolean; onOpen: (page: Page, href: string) => void }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          asChild
+          variant="ghost"
+          size="icon"
+          className={cn("rounded-full", active ? "bg-white/10 text-white" : "text-white/70")}
+        >
           <a
             href="/help"
             aria-label="Help"
+            aria-current={active ? "page" : undefined}
             onClick={(event) => {
               event.preventDefault();
               onOpen("help", "/help");

@@ -24,6 +24,7 @@ export interface SyncedProfile {
   publicCollection: boolean;
   cards: number;
   sss: number;
+  collectionValue: number;
   avatarUrl: string | null;
 }
 
@@ -63,7 +64,7 @@ interface CollectionPage {
     level?: number;
     publicCollection?: boolean;
     avatar?: string;
-    stats?: { cards?: number; sss?: number };
+    stats?: { cards?: number; sss?: number; collectionValue?: number };
   };
   cards?: {
     copy?: {
@@ -135,6 +136,7 @@ function profileFrom(page: CollectionPage): SyncedProfile | null {
     publicCollection: profile.publicCollection ?? false,
     cards: profile.stats?.cards ?? 0,
     sss: profile.stats?.sss ?? 0,
+    collectionValue: profile.stats?.collectionValue ?? 0,
     avatarUrl: avatar
       ? new URL(avatar, "https://koi-card-collector.com").href
       : null,

@@ -9,6 +9,7 @@ export interface SessionProfile {
   publicCollection: boolean;
   cards: number;
   sss: number;
+  collectionValue?: number;
 }
 
 export interface SessionUser {
@@ -35,7 +36,8 @@ export interface ListSync {
 }
 
 export type ListName = "forTrade" | "wishlist";
-export type Page = "catalog" | ListName | "trades" | "profile" | "help";
+export type Page = "catalog" | ListName | "trades" | "profile" | "help" | "leaderboard";
+export type LeaderboardBy = "sss" | "level" | "value";
 export type TradeView = "matches" | "you-want" | "they-want";
 
 export interface ListChange {
@@ -164,6 +166,7 @@ export const NO_PAGE_FILTERS: Record<Page, Filters> = {
   trades: NO_FILTERS,
   profile: NO_FILTERS,
   help: NO_FILTERS,
+  leaderboard: NO_FILTERS,
 };
 
 export interface Settings {
@@ -392,6 +395,7 @@ export function pageFromPath(path: string): Page {
   if (path === "/for-trade") return "forTrade";
   if (path === "/wishlist" || path === "/wanted") return "wishlist";
   if (/^\/trades(\/(you-want|they-want))?\/?$/.test(path)) return "trades";
+  if (/^\/leaderboard(\/(sss|level|value))?\/?$/.test(path)) return "leaderboard";
   if (profileIdFromPath(path)) return "profile";
   return "catalog";
 }
@@ -403,6 +407,15 @@ export function tradeViewFromPath(path: string): TradeView {
 
 export function tradeViewHref(view: TradeView): string {
   return view === "matches" ? "/trades" : `/trades/${view}`;
+}
+
+export function leaderboardByFromPath(path: string): LeaderboardBy {
+  const by = path.match(/^\/leaderboard\/(level|value)\/?$/)?.[1];
+  return by === "level" || by === "value" ? by : "sss";
+}
+
+export function leaderboardHref(by: LeaderboardBy): string {
+  return by === "sss" ? "/leaderboard" : `/leaderboard/${by}`;
 }
 
 export function profileIdFromPath(path: string): string | null {

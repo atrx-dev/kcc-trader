@@ -163,9 +163,9 @@ export function Showcase({ cards }: { cards: Card[] }) {
   );
 }
 
-export function StatPill({ value, label }: { value: number; label: string }) {
+export function StatPill({ value, label, className }: { value: number; label: string; className?: string }) {
   return (
-    <div className="flex items-baseline gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
+    <div className={cn("flex items-baseline gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1", className)}>
       <dt className="sr-only">{label}</dt>
       <dd className="font-display text-sm font-bold tabular-nums">{value.toLocaleString()}</dd>
       <span aria-hidden="true" className="text-xs text-white/60">

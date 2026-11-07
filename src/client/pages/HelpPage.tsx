@@ -7,6 +7,7 @@ const ARTICLES = [
   { id: "lists", label: "For trade and Wishlist" },
   { id: "trades", label: "Finding a trade" },
   { id: "catalog", label: "Browsing the catalog" },
+  { id: "leaderboard", label: "Leaderboard" },
 ] as const;
 
 export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => void }) {
@@ -147,6 +148,27 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
           in Settings, shows a note the first time you open the site while signed in after something new is added. If more than one
           piled up, the newest one comes first and you can step through the rest. Show what's new opens those notes again.
         </p>
+      </Article>
+
+      <Article id="leaderboard" title="Leaderboard">
+        <p>
+          The{" "}
+          <PageLink page="leaderboard" href="/leaderboard" onOpen={onOpen}>
+            leaderboard
+          </PageLink>{" "}
+          ranks traders who have a public KCC collection. It opens ranked by SSS cards.{" "}
+          <strong className="font-semibold text-white">Collection value</strong> is the number KCC gives a collection,
+          and <strong className="font-semibold text-white">Level</strong> is the KCC level. Your own row says You.
+        </p>
+        <Figure
+          src="/help/leaderboard.svg"
+          alt="The leaderboard ranks traders by SSS, collection value, or level. The trophy in the header opens it."
+        />
+        <p>
+          The trophy in the header opens it. So does the traders count on the catalog banner. A row opens that person's
+          page.
+        </p>
+        <p>You show up after you visit with a public collection. The numbers are the ones from your last sync.</p>
       </Article>
     </div>
   );

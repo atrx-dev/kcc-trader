@@ -97,6 +97,87 @@ export async function countTraders(env: ListEnv): Promise<number> {
   return Number(row?.total ?? 0);
 }
 
+export type LeaderboardBy = "sss" | "level" | "value";
+
+export interface LeaderboardEntry {
+  rank: number;
+  id: string;
+  name: string;
+  username: string;
+  avatarUrl: string;
+  kccName: string | null;
+  sss: number;
+  level: number;
+  value: number;
+}
+
+const LEADERBOARD_ORDER: Record<LeaderboardBy, string> = {
+  sss: "sss DESC, collection_value DESC, level DESC",
+  level: "level DESC, sss DESC, collection_value DESC",
+  value: "collection_value DESC, sss DESC, level DESC",
+};
+
+export interface CollectionStats {
+  cards: number;
+  sss: number;
+  level: number;
+  collectionValue: number | null;
+}
+
+export function recordCollection(env: ListEnv, traderId: string, stats: CollectionStats | null): Promise<D1Result> {
+  if (!stats) {
+    return env.DB.prepare(
+      "UPDATE traders SET cards = NULL, sss = NULL, level = NULL, collection_value = NULL WHERE id = ?",
+    )
+      .bind(traderId)
+      .run();
+  }
+  return env.DB.prepare(
+    "UPDATE traders SET cards = ?2, sss = ?3, level = ?4, collection_value = COALESCE(?5, collection_value) WHERE id = ?1",
+  )
+    .bind(traderId, stats.cards, stats.sss, stats.level, stats.collectionValue)
+    .run();
+}
+
+export async function readLeaderboard(env: ListEnv, by: LeaderboardBy): Promise<LeaderboardEntry[]> {
+  const rows = await env.DB.prepare(
+    `SELECT id, name, username, avatar_url, kcc_name, sss, level, collection_value AS value
+     FROM traders
+     WHERE sss IS NOT NULL${by === "value" ? " AND collection_value IS NOT NULL" : ""}
+     ORDER BY ${LEADERBOARD_ORDER[by]}, name COLLATE NOCASE
+     LIMIT 100`,
+  ).all<{
+    id: string;
+    name: string;
+    username: string;
+    avatar_url: string;
+    kcc_name: string | null;
+    sss: number;
+    level: number;
+    value: number | null;
+  }>();
+  let rank = 0;
+  let previous = Number.NaN;
+  return rows.results.map((row, index) => {
+    const score = by === "value" ? row.value ?? 0 : row[by];
+    if (score !== previous) {
+      rank = index + 1;
+      previous = score;
+    }
+    return {
+      rank,
+      id: row.id,
+      name: row.name,
+      username: row.username,
+      avatarUrl: row.avatar_url,
+      kccName: row.kcc_name,
+      sss: row.sss,
+      level: row.level,
+      value: row.value ?? 0,
+    };
+  });
+}
+
 export async function searchTraders(env: ListEnv, raw: string): Promise<Trader[]> {
   const query = raw.trim().slice(0, 40);
   if (query.length < 2) return [];

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a2148"/>
+      <stop offset="1" stop-color="#221b3c"/>
+    </linearGradient>
+    <linearGradient id="avatar" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#8ee0b2"/>
+      <stop offset="1" stop-color="#3d8f78"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="220" fill="url(#bg)"/>
+  <rect x="168" y="28" width="304" height="36" rx="18" fill="#151225" stroke="#ffffff" stroke-opacity="0.1"/>
+  <rect x="172" y="32" width="96" height="28" rx="14" fill="#f3d58f"/>
+  <text x="220" y="51" text-anchor="middle" fill="#1b1509" font-family="Segoe UI, sans-serif" font-size="13" font-weight="700">SSS</text>
+  <text x="320" y="51" text-anchor="middle" fill="#ffffff" fill-opacity="0.7" font-family="Segoe UI, sans-serif" font-size="13" font-weight="700">Value</text>
+  <text x="420" y="51" text-anchor="middle" fill="#ffffff" fill-opacity="0.7" font-family="Segoe UI, sans-serif" font-size="13" font-weight="700">Level</text>
+  <rect x="96" y="84" width="448" height="104" rx="18" fill="#1c1830" stroke="#f3d58f" stroke-opacity="0.45"/>
+  <g transform="translate(120 124)" fill="none" stroke="#fde68a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/>
+    <path d="M5 21h14"/>
+  </g>
+  <circle cx="184" cy="136" r="18" fill="url(#avatar)"/>
+  <text x="214" y="132" fill="#ffffff" font-family="Segoe UI, sans-serif" font-size="15" font-weight="700">Mika</text>
+  <text x="214" y="152" fill="#ffffff" fill-opacity="0.5" font-family="Segoe UI, sans-serif" font-size="12">@mika.trades</text>
+  <text x="512" y="132" text-anchor="end" fill="#ffffff" font-family="Segoe UI, sans-serif" font-size="20" font-weight="700">140</text>
+  <text x="512" y="152" text-anchor="end" fill="#ffffff" fill-opacity="0.5" font-family="Segoe UI, sans-serif" font-size="12">SSS</text>
+</svg>

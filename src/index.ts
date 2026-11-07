@@ -6,8 +6,12 @@ import {
   readLists,
   readPublicLists,
   countTraders,
+  readLeaderboard,
+  recordCollection,
   rememberTrader,
+  type CollectionStats,
   searchTraders,
+  type LeaderboardBy,
   setPreferences,
   syncLists,
   type ListChange,
@@ -33,7 +37,8 @@ function sameUser(left: SessionUser, right: SessionUser): boolean {
     profile?.level === next?.level &&
     profile?.publicCollection === next?.publicCollection &&
     profile?.cards === next?.cards &&
-    profile?.sss === next?.sss
+    profile?.sss === next?.sss &&
+    profile?.collectionValue === next?.collectionValue
   );
 }
 
@@ -51,8 +56,26 @@ function withSyncedProfile(user: SessionUser, profile: SyncedProfile): SessionUs
       publicCollection: profile.publicCollection,
       cards: profile.cards,
       sss: profile.sss,
+      collectionValue: profile.collectionValue,
     },
   };
+}
+
+function collectionStats(user: SessionUser): CollectionStats | null {
+  const profile = user.profile;
+  if (!profile?.publicCollection) return null;
+  const cards = Number(profile.cards);
+  const sss = Number(profile.sss);
+  const level = Number(profile.level);
+  if (![cards, sss, level].every(Number.isFinite)) return null;
+  const collectionValue = Number(profile.collectionValue);
+  return { cards, sss, level, collectionValue: Number.isFinite(collectionValue) ? collectionValue : null };
+}
+
+async function snapshotCollection(env: Env, user: SessionUser): Promise<void> {
+  if (!user.profile) return;
+  await rememberTrader(env, traderFor(user));
+  await recordCollection(env, user.id, collectionStats(user));
 }
 
 function traderFor(user: SessionUser): Trader {
@@ -136,6 +159,7 @@ export default {
         const catalogChanged = artworkAdded || (await discoverHiddenCards(env, characterIds).catch(() => false));
         const listSync = await syncOwnedLists(env, user.id, owned);
         const refreshed = owned.profile ? withSyncedProfile(user, owned.profile) : user;
+        await snapshotCollection(env, refreshed);
         const changed = !sameUser(user, refreshed);
         if (
           changed &&
@@ -166,6 +190,14 @@ export default {
       if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
       const [matches, demand] = await Promise.all([findTrades(env, user.id), wishlistDemand(env, user.id)]);
       return Response.json({ matches, demand });
+    }
+
+    if (url.pathname === "/api/leaderboard" && request.method === "GET") {
+      const requested = url.searchParams.get("by");
+      const by: LeaderboardBy = requested === "level" || requested === "value" ? requested : "sss";
+      const user = await readSession(request, env);
+      if (user) await snapshotCollection(env, user);
+      return Response.json({ by, traders: await readLeaderboard(env, by) });
     }
 
     if (url.pathname === "/api/traders/count" && request.method === "GET") {
@@ -212,6 +244,7 @@ export default {
       const user = await readSession(request, env);
       if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
       if (request.method === "GET") {
+        await snapshotCollection(env, user);
         return Response.json(await readLists(env, traderFor(user)));
       }
       if (request.method === "POST") {
