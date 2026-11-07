@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { CircleHelp, LogIn, LogOut, Search, Sparkles, Trophy } from "lucide-react";
+import { CircleHelp, LogIn, LogOut, Search, Shield, Sparkles, Trophy } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -288,6 +288,34 @@ export function LeaderboardButton({
         </Button>
       </TooltipTrigger>
       <TooltipContent>Leaderboard</TooltipContent>
+    </Tooltip>
+  );
+}
+
+export function AdminButton({ active, onOpen }: { active: boolean; onOpen: (page: Page, href: string) => void }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          asChild
+          variant="ghost"
+          size="icon"
+          className={cn("rounded-full", active ? "bg-white/10 text-white" : "text-white/70")}
+        >
+          <a
+            href="/admin"
+            aria-label="Admin"
+            aria-current={active ? "page" : undefined}
+            onClick={(event) => {
+              event.preventDefault();
+              onOpen("admin", "/admin");
+            }}
+          >
+            <Shield />
+          </a>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Admin</TooltipContent>
     </Tooltip>
   );
 }

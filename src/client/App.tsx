@@ -5,7 +5,7 @@ import { cardKey, type Card, type Catalog } from "../types.ts";
 import { VirtualGrid } from "./VirtualGrid.tsx";
 import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, byName, newestFirst, mostDesired, type CatalogSort, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, tradeViewFromPath, tradeViewHref, type TradeView, leaderboardByFromPath, leaderboardHref, type LeaderboardBy, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters, seenTradesKey, tradeSignature, readSeenTrades } from "./model.ts";
 import { CardFace } from "./components/cards.tsx";
-import { formatSyncedAt, Brand, NavTabs, AccountMenu, HelpButton, LeaderboardButton, TraderSearch } from "./components/header.tsx";
+import { formatSyncedAt, AdminButton, Brand, NavTabs, AccountMenu, HelpButton, LeaderboardButton, TraderSearch } from "./components/header.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
 import { SettingsSheet } from "./components/SettingsSheet.tsx";
 import { EmptyState, Banner, GridSkeleton, Showcase, StatPill, WelcomeDialog } from "./components/common.tsx";
@@ -13,6 +13,7 @@ import { ProfilePage } from "./pages/ProfilePage.tsx";
 import { TradesPage } from "./pages/TradesPage.tsx";
 import { LeaderboardPage } from "./pages/LeaderboardPage.tsx";
 import { ListPage } from "./pages/ListPage.tsx";
+import { AdminPage } from "./pages/AdminPage.tsx";
 import { HelpPage } from "./pages/HelpPage.tsx";
 import { FeatureDialog } from "./components/FeatureDialog.tsx";
 import { FEATURES, SEEN_FEATURE_KEY, unseenFeatures } from "./features.ts";
@@ -37,6 +38,7 @@ export function App() {
   const [catalogSort, setCatalogSort] = useState<CatalogSort>("rarity");
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [admin, setAdmin] = useState(false);
   const [userLoaded, setUserLoaded] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [lists, setLists] = useState<Lists>(NO_LISTS);
@@ -108,14 +110,16 @@ export function App() {
     setAuthError(code ? (AUTH_ERRORS[code] ?? "Discord sign-in failed.") : null);
     const controller = new AbortController();
     fetch("/api/me", { signal: controller.signal })
-      .then((response) => response.json() as Promise<{ user: SessionUser | null }>)
+      .then((response) => response.json() as Promise<{ user: SessionUser | null; admin?: boolean }>)
       .then((data) => {
         setUser(data.user);
+        setAdmin(Boolean(data.admin));
         setUserLoaded(true);
       })
       .catch((cause: unknown) => {
         if (cause instanceof DOMException && cause.name === "AbortError") return;
         setUser(null);
+        setAdmin(false);
         setUserLoaded(true);
       });
     return () => controller.abort();
@@ -624,6 +628,7 @@ export function App() {
     profile: null,
     help: null,
     leaderboard: null,
+    admin: null,
   };
   const tradeMatches = useMemo(
     () =>
@@ -675,6 +680,11 @@ export function App() {
             <TraderSearch onOpen={openPage} />
             <LeaderboardButton active={page === "leaderboard"} onOpen={openPage} />
             <HelpButton active={page === "help"} onOpen={openPage} />
+            {admin ? (
+              <span className="hidden sm:contents">
+                <AdminButton active={page === "admin"} onOpen={openPage} />
+              </span>
+            ) : null}
             <SettingsSheet
               settings={settings}
               onChange={updateSettings}
@@ -691,6 +701,7 @@ export function App() {
               onListDuplicatesChange={(listDuplicates) => void savePreference({ listDuplicates })}
               signedIn={user !== null}
               onShowFeatures={() => setReplayFeatures(true)}
+              onOpenAdmin={admin ? () => openPage("admin", "/admin") : undefined}
             />
             {userLoaded ? <AccountMenu user={user} privateProfile={needsPublicProfile} onOpen={openPage} /> : null}
           </div>
@@ -751,7 +762,9 @@ export function App() {
           onDisable={disableFeatures}
         />
 
-        {page === "help" ? (
+        {page === "admin" ? (
+          <AdminPage />
+        ) : page === "help" ? (
           <HelpPage onOpen={openPage} />
         ) : page === "leaderboard" ? (
           <LeaderboardPage

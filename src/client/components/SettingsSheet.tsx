@@ -24,6 +24,7 @@ export function SettingsSheet({
   onListDuplicatesChange,
   signedIn,
   onShowFeatures,
+  onOpenAdmin,
 }: {
   settings: Settings;
   onChange: (settings: Settings) => void;
@@ -40,6 +41,7 @@ export function SettingsSheet({
   onListDuplicatesChange: (listDuplicates: boolean) => void;
   signedIn: boolean;
   onShowFeatures: () => void;
+  onOpenAdmin?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const visibleRarities = rarities.filter((rarity) => !settings.hiddenRarities.includes(rarity));
@@ -314,6 +316,27 @@ export function SettingsSheet({
               ) : null}
             </section>
           </SettingsGroup>
+
+          {onOpenAdmin ? (
+            <SettingsGroup title="Admin">
+              <section className="flex items-center justify-between gap-4">
+                <div>
+                  <h4 className="font-display text-base font-bold">Admin panel</h4>
+                  <p className="text-sm text-white/60">Resync the catalog, or every trader's profile and collection.</p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="shrink-0 rounded-full"
+                  onClick={() => {
+                    setOpen(false);
+                    onOpenAdmin();
+                  }}
+                >
+                  Open
+                </Button>
+              </section>
+            </SettingsGroup>
+          ) : null}
         </div>
       </SheetContent>
     </Sheet>

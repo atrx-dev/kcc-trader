@@ -224,8 +224,15 @@ type SyncState = { finishedAt: string } | SyncRun;
 
 export type SyncProgress =
   | { status: "idle"; finishedAt: string }
-  | { status: "running"; remaining: number }
+  | { status: "running"; remaining: number; locked?: boolean }
   | { status: "done"; syncedAt: string; count: number };
+
+export interface CatalogSyncStatus {
+  status: "idle" | "running";
+  finishedAt: string | null;
+  remaining: number;
+  count: number | null;
+}
 
 function freshRun(): SyncRun {
   return {
@@ -327,7 +334,9 @@ export async function stepCatalogSync(env: SyncEnv, force = false): Promise<Sync
     return { status: "idle", finishedAt: state.finishedAt };
   }
   const lock = await env.CARDS.get(LOCK_KEY);
-  if (lock && Date.now() - Number(lock) < LOCK_MS) return { status: "running", remaining: remainingOf(state) };
+  if (lock && Date.now() - Number(lock) < LOCK_MS) {
+    return { status: "running", remaining: remainingOf(state), ...(force ? { locked: true } : {}) };
+  }
   await env.CARDS.put(LOCK_KEY, String(Date.now()), { expirationTtl: 60 });
   const run = force || !state || "finishedAt" in state ? freshRun() : state;
   let budget = REQUEST_BUDGET;
@@ -384,6 +393,27 @@ export async function stepCatalogSync(env: SyncEnv, force = false): Promise<Sync
   await env.CARDS.put(SYNC_STATE_KEY, JSON.stringify({ finishedAt: catalog.syncedAt }));
   await env.CARDS.delete(LOCK_KEY);
   return { status: "done", syncedAt: catalog.syncedAt!, count: catalog.cards.length };
+}
+
+export async function catalogSyncStatus(env: SyncEnv): Promise<CatalogSyncStatus> {
+  const state = await env.CARDS.get<SyncState>(SYNC_STATE_KEY, "json");
+  const raw = await env.CARDS.get("catalog");
+  let finishedAt: string | null = null;
+  let count: number | null = null;
+  if (raw) {
+    try {
+      const catalog = JSON.parse(raw) as { syncedAt?: string | null; cards?: unknown[] };
+      finishedAt = catalog.syncedAt ?? null;
+      count = Array.isArray(catalog.cards) ? catalog.cards.length : null;
+    } catch {
+      finishedAt = null;
+    }
+  }
+  if (state && "finishedAt" in state) finishedAt = state.finishedAt;
+  if (state && !("finishedAt" in state)) {
+    return { status: "running", finishedAt, remaining: remainingOf(state), count };
+  }
+  return { status: "idle", finishedAt, remaining: 0, count };
 }
 
 export async function readCatalog(env: SyncEnv): Promise<Catalog> {

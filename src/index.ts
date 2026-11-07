@@ -21,7 +21,8 @@ import {
 } from "./lists.ts";
 import { isSpare, ownsCard, readOwned, SyncCooldownError, type OwnedResponse, type SyncedProfile } from "./owned.ts";
 import { profileEmbed, withProfileMeta } from "./embed.ts";
-import { addSsArtwork, discoverHiddenCards, readCatalog, stepCatalogSync } from "./sync.ts";
+import { isAdmin, profileSyncStatus, stepProfileSync } from "./admin.ts";
+import { addSsArtwork, catalogSyncStatus, discoverHiddenCards, readCatalog, stepCatalogSync } from "./sync.ts";
 import { findTrades, wishlistDemand } from "./trades.ts";
 import { cardKey } from "./types.ts";
 
@@ -118,6 +119,13 @@ interface Env extends AuthEnv {
   SYNC_TOKEN?: string;
 }
 
+async function requireAdmin(request: Request, env: Env): Promise<SessionUser | Response> {
+  const user = await readSession(request, env);
+  if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
+  if (!isAdmin(user)) return Response.json({ error: "Forbidden" }, { status: 403 });
+  return user;
+}
+
 function authorized(request: Request, env: Env): boolean {
   const token = env.SYNC_TOKEN;
   if (!token) return false;
@@ -144,7 +152,8 @@ export default {
     }
 
     if (url.pathname === "/api/me" && request.method === "GET") {
-      return Response.json({ user: await readSession(request, env) });
+      const user = await readSession(request, env);
+      return Response.json({ user, admin: isAdmin(user) });
     }
 
     if (url.pathname === "/api/owned" && (request.method === "GET" || request.method === "POST")) {
@@ -307,6 +316,35 @@ export default {
       const pageUrl = new URL(`/u/${profilePath[1]}`, url.origin).href;
       const document = withProfileMeta(shell, profileEmbed(lists), pageUrl);
       return request.method === "HEAD" ? new Response(null, { status: document.status, headers: document.headers }) : document;
+    }
+
+    if (url.pathname === "/api/admin" && request.method === "GET") {
+      const gate = await requireAdmin(request, env);
+      if (gate instanceof Response) return gate;
+      const [catalog, profiles] = await Promise.all([catalogSyncStatus(env), profileSyncStatus(env)]);
+      return Response.json({ catalog, profiles });
+    }
+
+    if (url.pathname === "/api/admin/catalog" && request.method === "POST") {
+      const gate = await requireAdmin(request, env);
+      if (gate instanceof Response) return gate;
+      try {
+        return Response.json(await stepCatalogSync(env, url.searchParams.has("restart")));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Sync failed";
+        return Response.json({ error: message }, { status: 502 });
+      }
+    }
+
+    if (url.pathname === "/api/admin/profiles" && request.method === "POST") {
+      const gate = await requireAdmin(request, env);
+      if (gate instanceof Response) return gate;
+      try {
+        return Response.json(await stepProfileSync(env, url.searchParams.has("restart")));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Sync failed";
+        return Response.json({ error: message }, { status: 502 });
+      }
     }
 
     if (url.pathname === "/sync" && request.method === "POST") {

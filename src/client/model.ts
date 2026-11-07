@@ -36,7 +36,7 @@ export interface ListSync {
 }
 
 export type ListName = "forTrade" | "wishlist";
-export type Page = "catalog" | ListName | "trades" | "profile" | "help" | "leaderboard";
+export type Page = "catalog" | ListName | "trades" | "profile" | "help" | "leaderboard" | "admin";
 export type LeaderboardBy = "sss" | "level" | "value";
 export type TradeView = "matches" | "you-want" | "they-want";
 
@@ -167,6 +167,7 @@ export const NO_PAGE_FILTERS: Record<Page, Filters> = {
   profile: NO_FILTERS,
   help: NO_FILTERS,
   leaderboard: NO_FILTERS,
+  admin: NO_FILTERS,
 };
 
 export interface Settings {
@@ -392,6 +393,7 @@ export const ACTIONS_HEIGHT = 34;
 
 export function pageFromPath(path: string): Page {
   if (path === "/help" || path === "/help/") return "help";
+  if (path === "/admin" || path === "/admin/") return "admin";
   if (path === "/for-trade") return "forTrade";
   if (path === "/wishlist" || path === "/wanted") return "wishlist";
   if (/^\/trades(\/(you-want|they-want))?\/?$/.test(path)) return "trades";
