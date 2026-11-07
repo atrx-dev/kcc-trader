@@ -64,6 +64,12 @@ export const FEATURES: FeatureNote[] = [
     body: "The trophy in the header opens a leaderboard of public collections. It ranks by SSS cards, with collection value and level as the other orders.",
     image: "/features/leaderboard.svg",
   },
+  {
+    id: "owned-tags",
+    title: "Owned tags",
+    body: "A check in the corner marks a card you own. Turn Owned tags off in Settings to hide it.",
+    image: "/features/owned-tags.svg",
+  },
 ];
 
 function newestFirst(notes: readonly FeatureNote[]): FeatureNote[] {

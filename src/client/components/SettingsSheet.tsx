@@ -186,6 +186,21 @@ export function SettingsSheet({
             <section className="flex flex-col gap-3">
               <div className="flex items-start justify-between gap-4">
                 <div>
+                  <h4 id="owned-marks-label" className="font-display text-base font-bold">
+                    Owned tags
+                  </h4>
+                  <p className="text-sm text-white/60">A check in the corner of a card you own.</p>
+                </div>
+                <Switch
+                  labelledBy="owned-marks-label"
+                  checked={settings.ownedMarks}
+                  onChange={(ownedMarks) => onChange({ ...settings, ownedMarks })}
+                />
+              </div>
+            </section>
+            <section className="flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
                   <h4 id="wishlist-marks-label" className="font-display text-base font-bold">
                     Wishlist counts
                   </h4>

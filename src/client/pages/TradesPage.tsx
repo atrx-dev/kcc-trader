@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { cardKey, type Card } from "../../types.ts";
-import { duplicateCount, kccTradeUrl, lastSeenLabel, tradeViewHref, type OwnedState, type Page, type SessionUser, type TradeView, type Trader } from "../model.ts";
+import { duplicateCount, isOwned, kccTradeUrl, lastSeenLabel, tradeViewHref, type OwnedState, type Page, type SessionUser, type TradeView, type Trader } from "../model.ts";
 import { CardFace } from "../components/cards.tsx";
 import { EmptyState } from "../components/common.tsx";
 
@@ -23,12 +23,14 @@ export function MatchCards({
   cards,
   tone,
   owned,
+  ownedMarks,
   priority,
 }: {
   title: string;
   cards: Card[];
   tone: string;
   owned: OwnedState;
+  ownedMarks: boolean;
   priority: Set<string>;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -45,7 +47,7 @@ export function MatchCards({
       <div className="grid grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2">
         {shown.map((card) => (
           <div key={cardKey(card)} className="trade-thumb">
-            <CardFace card={card} copies={duplicateCount(card, owned)} priority={priority.has(cardKey(card))} />
+            <CardFace card={card} copies={duplicateCount(card, owned)} owned={ownedMarks && isOwned(card, owned)} priority={priority.has(cardKey(card))} />
           </div>
         ))}
       </div>
@@ -66,10 +68,12 @@ export function MatchCards({
 export function TraderMatch({
   match,
   owned,
+  ownedMarks,
   onOpen,
 }: {
   match: ResolvedMatch;
   owned: OwnedState;
+  ownedMarks: boolean;
   onOpen: (page: Page, href: string) => void;
 }) {
   const { trader, theyHave, theyWant, priority } = match;
@@ -109,10 +113,10 @@ export function TraderMatch({
       </header>
       <div className={cn("grid gap-3", theyHave.length > 0 && theyWant.length > 0 && "md:grid-cols-2")}>
         {theyHave.length > 0 ? (
-          <MatchCards title="They have, you want" cards={theyHave} tone="bg-rose-300" owned={owned} priority={priority} />
+          <MatchCards title="They have, you want" cards={theyHave} tone="bg-rose-300" owned={owned} ownedMarks={ownedMarks} priority={priority} />
         ) : null}
         {theyWant.length > 0 ? (
-          <MatchCards title="You have, they want" cards={theyWant} tone="bg-sky-300" owned={owned} priority={priority} />
+          <MatchCards title="You have, they want" cards={theyWant} tone="bg-sky-300" owned={owned} ownedMarks={ownedMarks} priority={priority} />
         ) : null}
       </div>
     </article>
@@ -191,6 +195,7 @@ export function TradesPage({
   onOpen,
   accepting,
   owned,
+  ownedMarks,
   view,
   onView,
 }: {
@@ -205,6 +210,7 @@ export function TradesPage({
   onRetry: () => void;
   onOpen: (page: Page, href: string) => void;
   owned: OwnedState;
+  ownedMarks: boolean;
   view: TradeView;
   onView: (view: TradeView) => void;
 }) {
@@ -333,7 +339,7 @@ export function TradesPage({
       ) : (
         <div className="grid gap-4">
           {shown.map((match) => (
-            <TraderMatch key={match.trader.id} match={match} owned={owned} onOpen={onOpen} />
+            <TraderMatch key={match.trader.id} match={match} owned={owned} ownedMarks={ownedMarks} onOpen={onOpen} />
           ))}
         </div>
       )}

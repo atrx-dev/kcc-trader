@@ -488,6 +488,7 @@ export function App() {
       cardEffects: next.cardEffects,
       featureNotes: next.featureNotes,
       wishlistMarks: next.wishlistMarks,
+      ownedMarks: next.ownedMarks,
     };
     setSettings(cleaned);
     window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(cleaned));
@@ -786,6 +787,7 @@ export function App() {
             filters={pageFilters.profile}
             onFiltersChange={(next) => setFiltersFor("profile", next)}
             owned={owned}
+            ownedMarks={settings.ownedMarks}
             ownedControls={ownedControls}
             myAccepting={lists.accepting !== false}
           />
@@ -802,6 +804,7 @@ export function App() {
             onOpen={openPage}
             accepting={lists.accepting !== false}
             owned={owned}
+            ownedMarks={settings.ownedMarks}
             view={tradeView}
             onView={openTradeView}
           />
@@ -839,6 +842,7 @@ export function App() {
             onPriority={setPriority}
             unlistedDuplicates={unlistedDuplicates}
             owned={owned}
+            ownedMarks={settings.ownedMarks}
             wanted={settings.wishlistMarks ? wantedBy : undefined}
           />
         ) : (
@@ -933,6 +937,7 @@ export function App() {
                     <CardFace
                       card={card}
                       copies={duplicateCount(card, owned)}
+                      owned={settings.ownedMarks && isOwned(card, owned)}
                       priority={onWishlist && priorityKeys.has(key)}
                       wanted={settings.wishlistMarks ? (wantedBy.get(key) ?? 0) : 0}
                       onPriority={() => setPriority(key, !(onWishlist && priorityKeys.has(key)))}

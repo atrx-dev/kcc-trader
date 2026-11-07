@@ -1,5 +1,5 @@
 import { type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { Copy, Heart, Star } from "lucide-react";
+import { Check, Copy, Heart, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isNewCard, type Card } from "../../types.ts";
 import { frameUrl, hasFrame, namePlateStyle } from "../frame.ts";
@@ -130,6 +130,18 @@ function NewMark() {
   );
 }
 
+function OwnedMark() {
+  return (
+    <span
+      className="owned-mark pointer-events-none inline-flex h-5 max-w-full items-center gap-1 rounded-full bg-emerald-200 px-1.5 py-1 text-[11px] leading-none font-bold text-emerald-950 shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
+      aria-label="Owned"
+    >
+      <Check className="size-3 shrink-0" aria-hidden="true" />
+      <span className="owned-label">Owned</span>
+    </span>
+  );
+}
+
 function DuplicateMark({ count }: { count: number }) {
   return (
     <span
@@ -146,12 +158,14 @@ function DuplicateMark({ count }: { count: number }) {
 export function CardFace({
   card,
   copies = 0,
+  owned = false,
   priority = false,
   wanted = 0,
   onPriority,
 }: {
   card: Card;
   copies?: number;
+  owned?: boolean;
   priority?: boolean;
   wanted?: number;
   onPriority?: () => void;
@@ -164,7 +178,7 @@ export function CardFace({
       className={holo ? "card framed-card foil" : "card framed-card"}
       data-rank={card.rank}
       data-sss-border={card.rank === "SSS" && framed ? card.border || "starry" : undefined}
-      aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${fresh ? ", new" : ""}${priority ? ", priority" : ""}${copies > 1 ? `, ${copies} copies` : ""}${wanted > 0 ? `, wishlisted by ${wanted}` : ""}`}
+      aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${fresh ? ", new" : ""}${priority ? ", priority" : ""}${copies > 1 ? `, ${copies} copies` : owned ? ", owned" : ""}${wanted > 0 ? `, wishlisted by ${wanted}` : ""}`}
     >
       {card.image ? (
         <img className="card-artwork" src={card.image} alt="" decoding="async" />
@@ -185,9 +199,9 @@ export function CardFace({
     <div className="card-stack">
       {holo ? <FoilCard card={card}>{face}</FoilCard> : face}
       {onPriority ? <PriorityToggle active={priority} onClick={onPriority} /> : priority ? <PriorityMark /> : null}
-      {copies > 1 || fresh || wanted > 0 ? (
+      {copies > 1 || owned || fresh || wanted > 0 ? (
         <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-3.25rem)] flex-wrap items-center gap-1">
-          {copies > 1 ? <DuplicateMark count={copies} /> : null}
+          {copies > 1 ? <DuplicateMark count={copies} /> : owned ? <OwnedMark /> : null}
           {fresh ? <NewMark /> : null}
           {wanted > 0 ? <WantedMark count={wanted} /> : null}
         </div>

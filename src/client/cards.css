@@ -82,7 +82,8 @@
   }
 }
 
-.duplicate-mark .duplicate-long {
+.duplicate-mark .duplicate-long,
+.owned-mark .owned-label {
   display: none;
 }
 
@@ -99,7 +100,8 @@
     display: none;
   }
 
-  .duplicate-mark .duplicate-long {
+  .duplicate-mark .duplicate-long,
+  .owned-mark .owned-label {
     display: inline;
   }
 }

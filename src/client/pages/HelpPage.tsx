@@ -134,7 +134,9 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
           alt="A card new to the catalog has a New mark in the corner. Sort can be Rarity, Name, Newest, or Most desired."
         />
         <p>
-          Once your collection has synced, Owned and Not owned split the catalog by what you have. Duplicates shows SS
+          Once your collection has synced, a check in the corner marks a card you own.{" "}
+          <strong className="font-semibold text-white">Owned tags</strong> is on by default. Turn it off in Settings to
+          hide that check. A spare copy shows how many you have. Owned and Not owned split the catalog by what you have. Duplicates shows SS
           and SSS cards you have more than one copy of. For trade only offers All and Duplicates, because every card
           there is one you own.
         </p>

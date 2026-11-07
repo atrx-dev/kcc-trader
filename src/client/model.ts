@@ -176,6 +176,7 @@ export interface Settings {
   cardEffects: boolean;
   featureNotes: boolean;
   wishlistMarks: boolean;
+  ownedMarks: boolean;
 }
 
 export const SETTINGS_KEY = "kcc-trader:settings";
@@ -185,6 +186,7 @@ export const DEFAULT_SETTINGS: Settings = {
   cardEffects: false,
   featureNotes: true,
   wishlistMarks: true,
+  ownedMarks: true,
 };
 
 export function stringList(value: unknown): string[] {
@@ -199,6 +201,7 @@ export function loadSettings(): Settings {
       cardEffects?: unknown;
       featureNotes?: unknown;
       wishlistMarks?: unknown;
+      ownedMarks?: unknown;
     } | null;
     if (!raw) return DEFAULT_SETTINGS;
     const facets = { ...NO_FACETS };
@@ -218,6 +221,7 @@ export function loadSettings(): Settings {
       cardEffects: raw.cardEffects === true,
       featureNotes: raw.featureNotes !== false,
       wishlistMarks: raw.wishlistMarks !== false,
+      ownedMarks: raw.ownedMarks !== false,
     };
   } catch {
     return DEFAULT_SETTINGS;
