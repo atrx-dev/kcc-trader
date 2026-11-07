@@ -92,6 +92,11 @@ export function parseChanges(value: unknown): ListChange[] | null {
 
 const TRADER_SEARCH_LIMIT = 8;
 
+export async function countTraders(env: ListEnv): Promise<number> {
+  const row = await env.DB.prepare("SELECT COUNT(*) AS total FROM traders").first<{ total: number }>();
+  return Number(row?.total ?? 0);
+}
+
 export async function searchTraders(env: ListEnv, raw: string): Promise<Trader[]> {
   const query = raw.trim().slice(0, 40);
   if (query.length < 2) return [];

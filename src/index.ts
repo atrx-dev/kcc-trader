@@ -5,6 +5,7 @@ import {
   markIntroduced,
   readLists,
   readPublicLists,
+  countTraders,
   rememberTrader,
   searchTraders,
   setPreferences,
@@ -165,6 +166,10 @@ export default {
       if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
       const [matches, demand] = await Promise.all([findTrades(env, user.id), wishlistDemand(env, user.id)]);
       return Response.json({ matches, demand });
+    }
+
+    if (url.pathname === "/api/traders/count" && request.method === "GET") {
+      return Response.json({ total: await countTraders(env) });
     }
 
     if (url.pathname === "/api/traders" && request.method === "GET") {

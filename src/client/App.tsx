@@ -66,6 +66,7 @@ export function App() {
   const [trades, setTrades] = useState<TradesState>({ status: "idle", matches: [], demand: {} });
   const [tradesVersion, setTradesVersion] = useState(0);
   const [seenTrades, setSeenTrades] = useState<Set<string>>(new Set());
+  const [traderCount, setTraderCount] = useState<number | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -84,6 +85,20 @@ export function App() {
       });
     return () => controller.abort();
   }, [catalogVersion]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/traders/count", { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("Could not count traders");
+        return response.json() as Promise<{ total: number }>;
+      })
+      .then((data) => setTraderCount(data.total))
+      .catch((cause: unknown) => {
+        if (cause instanceof DOMException && cause.name === "AbortError") return;
+      });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -808,6 +823,7 @@ export function App() {
                     <StatPill value={heroStats.sss} label="SSS" />
                     <StatPill value={heroStats.developers} label="developers" />
                     <StatPill value={heroStats.games} label="games" />
+                    {traderCount !== null ? <StatPill value={traderCount} label="traders" /> : null}
                   </dl>
                 ) : (
                   <p className="mt-1.5 text-sm text-white/60">Loading the catalog…</p>
