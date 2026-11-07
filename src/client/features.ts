@@ -34,6 +34,12 @@ export const FEATURES: FeatureNote[] = [
     body: "Search the header for a display name, Discord username, or KCC name, and open that person's page.",
     image: "/features/find-trader.svg",
   },
+  {
+    id: "profile-overlap",
+    title: "See the overlap",
+    body: "On someone else's page, the header shows how many of their cards you want, and how many of their wishes you can offer.",
+    image: "/features/profile-overlap.svg",
+  },
 ];
 
 function newestFirst(notes: readonly FeatureNote[]): FeatureNote[] {

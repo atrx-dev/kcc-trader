@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeftRight, ChevronDown, ExternalLink, Heart, SearchX, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, ChevronDown, ExternalLink, Heart, SearchX, Star, type LucideIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -180,6 +180,9 @@ export function ProfilePage({
   const filtering = filtersAreActive(filters, owned);
   const forTradeCards = forTrade.filter((card) => passing.has(card));
   const wishlistCards = wishlist.filter((card) => passing.has(card));
+  const theyHave = own ? [] : forTrade.filter((card) => myWishlist.has(cardKey(card)));
+  const theyWant = own ? [] : wishlist.filter((card) => myForTrade.has(cardKey(card)));
+  const priorityTheyWant = theyWant.filter((card) => priority.has(cardKey(card))).length;
 
   function showSection(id: "for-trade" | "wishlist") {
     setOpenSections((current) => ({ ...current, [id]: true }));
@@ -212,6 +215,17 @@ export function ProfilePage({
             {trader.kccName ? ` · ${trader.kccName} on KCC` : ""}
             {lastSeen ? ` · ${lastSeen}` : ""}
           </p>
+          {own || !user ? null : theyHave.length === 0 && theyWant.length === 0 ? (
+            <p className="mt-1.5 text-sm text-white/50">Nothing lines up with your lists.</p>
+          ) : (
+            <div className="mt-1.5 flex flex-wrap gap-1.5" aria-label="With your lists">
+              <OverlapChip icon={Heart} count={theyHave.length} label="you want" className="bg-rose-300/15 text-rose-100" />
+              <OverlapChip icon={ArrowLeftRight} count={theyWant.length} label="they want" className="bg-sky-300/15 text-sky-100" />
+              {priorityTheyWant > 0 ? (
+                <OverlapChip icon={Star} count={priorityTheyWant} label="priority" filled className="bg-[#f3d58f]/15 text-[#f3d58f]" />
+              ) : null}
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           {own ? (
@@ -296,5 +310,27 @@ export function ProfilePage({
         </div>
       </div>
     </>
+  );
+}
+
+function OverlapChip({
+  icon: Icon,
+  count,
+  label,
+  filled = false,
+  className,
+}: {
+  icon: LucideIcon;
+  count: number;
+  label: string;
+  filled?: boolean;
+  className: string;
+}) {
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold", className)}>
+      <Icon className={cn("size-3", filled && "fill-current")} />
+      <span className="tabular-nums">{count.toLocaleString()}</span>
+      {label}
+    </span>
   );
 }
