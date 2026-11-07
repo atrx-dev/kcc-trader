@@ -261,7 +261,12 @@ export function App() {
     const { welcome, ...lists } = data;
     savedLists.current = lists;
     setLists(withChanges(lists, pendingChanges.current));
-    if (welcome) setWelcomeOpen(true);
+    if (welcome) {
+      const latest = FEATURES.at(-1);
+      if (latest) window.localStorage.setItem(SEEN_FEATURE_KEY, latest.id);
+      setFeatureNotes([]);
+      setWelcomeOpen(true);
+    }
   }
 
   function dismissWelcome() {
