@@ -29,10 +29,10 @@ export const FEATURES: FeatureNote[] = [
     image: "/features/new-cards.svg",
   },
   {
-    id: "find-trader",
-    title: "Find a trader",
-    body: "Search the header for a display name, Discord username, or KCC name, and open that person's page.",
-    image: "/features/find-trader.svg",
+    id: "wishlist-counts",
+    title: "Wishlist counts",
+    body: "A rose heart on a card is how many other traders have it on their Wishlist. It shows in the catalog, on For trade, and on your Wishlist.",
+    image: "/features/wishlist-counts.svg",
   },
   {
     id: "profile-overlap",
@@ -41,22 +41,22 @@ export const FEATURES: FeatureNote[] = [
     image: "/features/profile-overlap.svg",
   },
   {
-    id: "trade-notice",
-    title: "New matches",
-    body: "The Trades tab shows how many matches you have as soon as you arrive. It lights up when a match is new since you last opened it.",
-    image: "/features/trade-notice.svg",
-  },
-  {
     id: "trade-views",
     title: "You want, they want",
     body: "On Trades, switch to who has a card on your Wishlist, or who wants a card you're offering. People who are already a match stay under Matches.",
     image: "/features/trade-views.svg",
   },
   {
-    id: "wishlist-counts",
-    title: "Wishlist counts",
-    body: "A rose heart on a card is how many other traders have it on their Wishlist. It shows in the catalog, on For trade, and on your Wishlist.",
-    image: "/features/wishlist-counts.svg",
+    id: "trade-notice",
+    title: "New matches",
+    body: "The Trades tab shows how many matches you have as soon as you arrive. It lights up when a match is new since you last opened it.",
+    image: "/features/trade-notice.svg",
+  },
+  {
+    id: "find-trader",
+    title: "Find a trader",
+    body: "Search the header for a display name, Discord username, or KCC name, and open that person's page.",
+    image: "/features/find-trader.svg",
   },
 ];
 
