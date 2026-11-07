@@ -156,7 +156,7 @@ export function App() {
         if (!controller.signal.aborted) setListsReady(true);
       });
     return () => controller.abort();
-  }, [user, userLoaded]);
+  }, [user?.id, userLoaded]);
 
   useEffect(() => {
     if (!user) {
@@ -191,7 +191,7 @@ export function App() {
         setOwned({ ...NO_OWNED, status: "unavailable" });
       });
     return () => controller.abort();
-  }, [user, userLoaded]);
+  }, [user?.id, userLoaded]);
 
   useEffect(() => {
     if (!user) {
@@ -213,14 +213,15 @@ export function App() {
         setTrades((current) => ({ ...current, status: "error" }));
       });
     return () => controller.abort();
-  }, [user, listsSaved, tradesVersion]);
+  }, [user?.id, listsSaved, tradesVersion]);
 
   async function syncOwned(force = false) {
     setOwnedSyncFailed(false);
     setOwned((current) => ({ ...current, syncing: true }));
     try {
-      const { state, catalogChanged, listSync } = await requestOwned("POST", undefined, force);
+      const { state, catalogChanged, listSync, user: refreshed } = await requestOwned("POST", undefined, force);
       setOwned(state);
+      if (refreshed) setUser(refreshed);
       if (catalogChanged) setCatalogVersion((version) => version + 1);
       applyListSync(listSync);
     } catch (cause) {
@@ -600,7 +601,7 @@ export function App() {
       window.localStorage.setItem(seenTradesKey(user.id), JSON.stringify(next));
       return new Set(next);
     });
-  }, [user, page, trades.status, catalog, tradeMatches]);
+  }, [user?.id, page, trades.status, catalog, tradeMatches]);
   if (trades.status === "ready" && catalog) counts.trades = tradeMatches.length;
   const tradeAttention = page !== "trades" && tradeMatches.some((match) => !seenTrades.has(matchSignature(match)));
 

@@ -1,10 +1,11 @@
-import { beginDiscordLogin, finishDiscordLogin, logout, readSession, type AuthEnv, type SessionUser } from "./auth.ts";
+import { beginDiscordLogin, finishDiscordLogin, logout, readSession, sessionCookie, type AuthEnv, type SessionUser } from "./auth.ts";
 import {
   changeLists,
   parseChanges,
   markIntroduced,
   readLists,
   readPublicLists,
+  rememberTrader,
   searchTraders,
   setPreferences,
   syncLists,
@@ -13,11 +14,45 @@ import {
   type Preferences,
   type Trader,
 } from "./lists.ts";
-import { isSpare, ownsCard, readOwned, SyncCooldownError, type OwnedResponse } from "./owned.ts";
+import { isSpare, ownsCard, readOwned, SyncCooldownError, type OwnedResponse, type SyncedProfile } from "./owned.ts";
 import { profileEmbed, withProfileMeta } from "./embed.ts";
 import { addSsArtwork, discoverHiddenCards, readCatalog, stepCatalogSync } from "./sync.ts";
 import { findTrades } from "./trades.ts";
 import { cardKey } from "./types.ts";
+
+function sameUser(left: SessionUser, right: SessionUser): boolean {
+  const profile = left.profile;
+  const next = right.profile;
+  return (
+    left.username === right.username &&
+    left.globalName === right.globalName &&
+    left.avatarUrl === right.avatarUrl &&
+    profile?.name === next?.name &&
+    profile?.discordUsername === next?.discordUsername &&
+    profile?.level === next?.level &&
+    profile?.publicCollection === next?.publicCollection &&
+    profile?.cards === next?.cards &&
+    profile?.sss === next?.sss
+  );
+}
+
+function withSyncedProfile(user: SessionUser, profile: SyncedProfile): SessionUser {
+  return {
+    ...user,
+    username: profile.discordUsername || user.username,
+    globalName: profile.name || user.globalName,
+    avatarUrl: profile.avatarUrl ?? user.avatarUrl,
+    profile: {
+      id: profile.id,
+      name: profile.name,
+      discordUsername: profile.discordUsername,
+      level: profile.level,
+      publicCollection: profile.publicCollection,
+      cards: profile.cards,
+      sss: profile.sss,
+    },
+  };
+}
 
 function traderFor(user: SessionUser): Trader {
   return {
@@ -99,8 +134,23 @@ export default {
         const characterIds = [...owned.ss, ...owned.sss].map((key) => key.split(":")[0]);
         const catalogChanged = artworkAdded || (await discoverHiddenCards(env, characterIds).catch(() => false));
         const listSync = await syncOwnedLists(env, user.id, owned);
-        const { previousDuplicates: _, artwork: __, ...cards } = owned;
-        return Response.json({ ...cards, catalogChanged, listSync });
+        const refreshed = owned.profile ? withSyncedProfile(user, owned.profile) : user;
+        const changed = !sameUser(user, refreshed);
+        if (
+          changed &&
+          (user.username !== refreshed.username ||
+            user.globalName !== refreshed.globalName ||
+            user.avatarUrl !== refreshed.avatarUrl ||
+            user.profile?.name !== refreshed.profile?.name ||
+            user.profile?.id !== refreshed.profile?.id)
+        ) {
+          await rememberTrader(env, traderFor(refreshed));
+        }
+        const { previousDuplicates: _, artwork: __, profile: ___, ...cards } = owned;
+        const body = { ...cards, catalogChanged, listSync, ...(changed ? { user: refreshed } : {}) };
+        if (!changed) return Response.json(body);
+        const cookie = await sessionCookie(request, env, refreshed);
+        return Response.json(body, cookie ? { headers: { "Set-Cookie": cookie } } : undefined);
       } catch (error) {
         if (error instanceof SyncCooldownError) {
           return Response.json({ error: error.message, nextSyncAt: error.nextSyncAt }, { status: 429 });

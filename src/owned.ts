@@ -16,10 +16,22 @@ export interface OwnedCards {
   fetchedAt: string;
 }
 
+export interface SyncedProfile {
+  id: string;
+  name: string;
+  discordUsername: string;
+  level: number;
+  publicCollection: boolean;
+  cards: number;
+  sss: number;
+  avatarUrl: string | null;
+}
+
 export type OwnedResponse = OwnedCards & {
   nextSyncAt: string;
   previousDuplicates?: Record<string, number>;
   artwork: Card[];
+  profile: SyncedProfile | null;
 };
 
 type CachedOwned = OwnedCards & { nextSyncAt: string };
@@ -44,6 +56,15 @@ interface CollectionVariant {
 interface CollectionPage {
   total?: number;
   hidden?: boolean;
+  profile?: {
+    id?: string;
+    name?: string;
+    discordUsername?: string;
+    level?: number;
+    publicCollection?: boolean;
+    avatar?: string;
+    stats?: { cards?: number; sss?: number };
+  };
   cards?: {
     copy?: {
       characterId?: string;
@@ -102,7 +123,25 @@ function legacySsCard(
   };
 }
 
-async function fetchOwned(profileId: string): Promise<{ owned: OwnedCards; artwork: Card[] }> {
+function profileFrom(page: CollectionPage): SyncedProfile | null {
+  const profile = page.profile;
+  if (!profile?.id || !profile.name) return null;
+  const avatar = profile.avatar ?? "";
+  return {
+    id: profile.id,
+    name: profile.name,
+    discordUsername: profile.discordUsername ?? "",
+    level: profile.level ?? 0,
+    publicCollection: profile.publicCollection ?? false,
+    cards: profile.stats?.cards ?? 0,
+    sss: profile.stats?.sss ?? 0,
+    avatarUrl: avatar
+      ? new URL(avatar, "https://koi-card-collector.com").href
+      : null,
+  };
+}
+
+async function fetchOwned(profileId: string): Promise<{ owned: OwnedCards; artwork: Card[]; profile: SyncedProfile | null }> {
   const first = await fetchPage(profileId, 0);
   const perPage = first.cards?.length ?? 0;
   const total = first.total ?? perPage;
@@ -147,6 +186,7 @@ async function fetchOwned(profileId: string): Promise<{ owned: OwnedCards; artwo
   }
 
   return {
+    profile: profileFrom(first),
     owned: {
       ss: [...ss.keys()],
       sss: [...sss.keys()],
@@ -184,10 +224,10 @@ export async function readOwned(env: OwnedEnv, profileId: string, refresh: boole
   const cached = await env.CARDS.get<OwnedCards>(cacheKey, "json");
   if (cached && Array.isArray(cached.ss)) {
     const response = withNextSync(cached);
-    if (!refresh) return { ...response, artwork: [] };
+    if (!refresh) return { ...response, artwork: [], profile: null };
     if (!force && Date.parse(response.nextSyncAt) > Date.now()) throw new SyncCooldownError(response.nextSyncAt);
   }
-  const { owned, artwork } = await fetchOwned(profileId);
+  const { owned, artwork, profile } = await fetchOwned(profileId);
   await env.CARDS.put(cacheKey, JSON.stringify(owned));
-  return { ...withNextSync(owned), previousDuplicates: cached?.duplicates ?? {}, artwork };
+  return { ...withNextSync(owned), previousDuplicates: cached?.duplicates ?? {}, artwork, profile };
 }

@@ -259,18 +259,23 @@ export async function requestOwned(
   method: "GET" | "POST",
   signal?: AbortSignal,
   force = false,
-): Promise<{ state: OwnedState; catalogChanged: boolean; listSync: ListSync | null }> {
+): Promise<{ state: OwnedState; catalogChanged: boolean; listSync: ListSync | null; user: SessionUser | null }> {
   const response = await fetch(force ? "/api/owned?force=1" : "/api/owned", { method, signal });
   if (response.status === 429) {
     const body = (await response.json().catch(() => null)) as { nextSyncAt?: string } | null;
     if (body?.nextSyncAt) throw new SyncCooldownError(body.nextSyncAt);
   }
   if (!response.ok) throw new Error("Could not load your collection");
-  const data = (await response.json()) as OwnedCards & { catalogChanged?: boolean; listSync?: ListSync | null };
+  const data = (await response.json()) as OwnedCards & {
+    catalogChanged?: boolean;
+    listSync?: ListSync | null;
+    user?: SessionUser;
+  };
   return {
     state: ownedFromResponse(data),
     catalogChanged: Boolean(data.catalogChanged),
     listSync: data.listSync ?? null,
+    user: data.user ?? null,
   };
 }
 

@@ -132,6 +132,10 @@ function flag(value: boolean | undefined): number | null {
   return value === undefined ? null : Number(value);
 }
 
+export function rememberTrader(env: ListEnv, trader: Trader): Promise<D1Result> {
+  return saveTrader(env, trader).run();
+}
+
 function saveTrader(env: ListEnv, trader: Trader, preferences: Partial<Preferences> = {}): D1PreparedStatement {
   return env.DB.prepare(
     `INSERT INTO traders (id, name, username, avatar_url, kcc_name, kcc_id, accepting, prune_wishlist, list_duplicates, last_seen_at, introduced)

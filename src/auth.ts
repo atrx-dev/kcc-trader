@@ -83,15 +83,15 @@ async function hmacKey(secret: string): Promise<CryptoKey> {
   );
 }
 
-async function seal(user: SessionUser, secret: string): Promise<string> {
-  const payload = new TextEncoder().encode(JSON.stringify({ ...user, exp: Date.now() + SESSION_MS }));
+async function seal(user: SessionUser, secret: string, exp = Date.now() + SESSION_MS): Promise<string> {
+  const payload = new TextEncoder().encode(JSON.stringify({ ...user, exp }));
   const signature = new Uint8Array(
     await crypto.subtle.sign("HMAC", await hmacKey(secret), payload),
   );
   return `${bytesToBase64Url(payload)}.${bytesToBase64Url(signature)}`;
 }
 
-async function open(token: string, secret: string): Promise<SessionUser | null> {
+async function open(token: string, secret: string): Promise<(SessionUser & { exp: number }) | null> {
   const [payloadPart, signaturePart] = token.split(".");
   if (!payloadPart || !signaturePart) return null;
   const payload = base64UrlToBytes(payloadPart);
@@ -106,7 +106,18 @@ async function open(token: string, secret: string): Promise<SessionUser | null> 
     globalName: parsed.globalName,
     avatarUrl: parsed.avatarUrl,
     profile: parsed.profile,
+    exp: parsed.exp,
   };
+}
+
+export async function sessionCookie(request: Request, env: AuthEnv, user: SessionUser): Promise<string | null> {
+  if (!env.SESSION_SECRET) return null;
+  const token = readCookie(request, COOKIE);
+  const current = token ? await open(token, env.SESSION_SECRET) : null;
+  const exp = current?.id === user.id ? current.exp : Date.now() + SESSION_MS;
+  const sealed = await seal(user, env.SESSION_SECRET, exp);
+  const maxAge = Math.max(0, Math.ceil((exp - Date.now()) / 1000));
+  return `${COOKIE}=${sealed}; ${cookieSuffix(request, maxAge)}`;
 }
 
 function callbackUrl(request: Request): string {
@@ -237,7 +248,10 @@ export async function readSession(request: Request, env: AuthEnv): Promise<Sessi
   const token = readCookie(request, COOKIE);
   if (!token) return null;
   try {
-    return await open(token, env.SESSION_SECRET);
+    const session = await open(token, env.SESSION_SECRET);
+    if (!session) return null;
+    const { exp: _, ...user } = session;
+    return user;
   } catch {
     return null;
   }
