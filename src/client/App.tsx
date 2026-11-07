@@ -3,7 +3,7 @@ import { RotateCcw, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cardKey, type Card, type Catalog } from "../types.ts";
 import { VirtualGrid } from "./VirtualGrid.tsx";
-import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, byName, newestFirst, type CatalogSort, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters, seenTradesKey, tradeSignature, readSeenTrades } from "./model.ts";
+import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, byName, newestFirst, mostDesired, type CatalogSort, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters, seenTradesKey, tradeSignature, readSeenTrades } from "./model.ts";
 import { CardFace } from "./components/cards.tsx";
 import { formatSyncedAt, Brand, NavTabs, AccountMenu, HelpButton, TraderSearch } from "./components/header.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
@@ -511,8 +511,6 @@ export function App() {
     listName === "forTrade" && filters.owned !== "duplicates" ? { ...filters, owned: "all" as const } : filters;
   const catalogView = listName ? null : applyFilters(cards, filters, owned, needle);
   const filteredCatalog = catalogView?.cards ?? [];
-  const catalogCards =
-    catalogSort === "added" ? newestFirst(filteredCatalog) : catalogSort === "name" ? byName(filteredCatalog) : filteredCatalog;
   const listView = listName ? applyFilters(selected, listFilters, owned, "") : null;
   const listOptions = listName ? facetOptionsFor(selected) : null;
   const ownedReady = owned.status === "ready";
@@ -603,6 +601,14 @@ export function App() {
     for (const [key, count] of Object.entries(trades.demand)) if (count > 0) counts.set(key, count);
     return counts;
   }, [trades.status, trades.demand]);
+  const catalogCards =
+    catalogSort === "added"
+      ? newestFirst(filteredCatalog)
+      : catalogSort === "name"
+        ? byName(filteredCatalog)
+        : catalogSort === "desired"
+          ? mostDesired(filteredCatalog, wantedBy)
+          : filteredCatalog;
   const mutualMatches = useMemo(
     () => tradeMatches.filter((match) => match.theyHave.length > 0 && match.theyWant.length > 0),
     [tradeMatches],

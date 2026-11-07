@@ -294,7 +294,7 @@ export function isOwned(card: Card, owned: OwnedState): boolean {
   return false;
 }
 
-export type CatalogSort = "rarity" | "added" | "name";
+export type CatalogSort = "rarity" | "added" | "name" | "desired";
 
 export function byName(cards: readonly Card[]): Card[] {
   return [...cards].sort(
@@ -303,6 +303,10 @@ export function byName(cards: readonly Card[]): Card[] {
       (a.variantName ?? "").localeCompare(b.variantName ?? "") ||
       RANK_ORDER.indexOf(b.rank) - RANK_ORDER.indexOf(a.rank),
   );
+}
+
+export function mostDesired(cards: readonly Card[], demand: ReadonlyMap<string, number>): Card[] {
+  return [...cards].sort((a, b) => (demand.get(cardKey(b)) ?? 0) - (demand.get(cardKey(a)) ?? 0));
 }
 
 export function newestFirst(cards: readonly Card[]): Card[] {

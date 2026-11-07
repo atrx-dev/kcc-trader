@@ -125,11 +125,12 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
         <p>
           Search covers the card name, variant, game, and developer. Rarity, type, game, and developer narrow the grid. A
           card new to the catalog in the last 7 days is marked New. Name sorts the catalog alphabetically. Newest
-          sorts additions first, and cards from before that tracking started stay in rarity order after them.
+          sorts additions first, and cards from before that tracking started stay in rarity order after them. Most
+          desired puts the cards the most other traders have wishlisted first.
         </p>
         <Figure
           src="/help/catalog.svg"
-          alt="A card new to the catalog has a New mark in the corner. Sort can be Rarity, Name, or Newest."
+          alt="A card new to the catalog has a New mark in the corner. Sort can be Rarity, Name, Newest, or Most desired."
         />
         <p>
           Once your collection has synced, Owned and Not owned split the catalog by what you have. Duplicates shows SS

@@ -178,6 +178,7 @@ const SORT_CHOICES: { value: CatalogSort; label: string }[] = [
   { value: "rarity", label: "Rarity" },
   { value: "name", label: "Name" },
   { value: "added", label: "Newest" },
+  { value: "desired", label: "Most desired" },
 ];
 
 export function SortToggle({
@@ -195,6 +196,7 @@ export function SortToggle({
     <Combobox
       items={SORT_CHOICES.map((choice) => choice.label)}
       value={current.label}
+      filter={null}
       onValueChange={(next: string | null) => {
         const choice = SORT_CHOICES.find((item) => item.label === next);
         if (choice) onChange(choice.value);
@@ -313,6 +315,7 @@ function OwnedField({
       items={options.map((choice) => choice.label)}
       value={current.label}
       disabled={disabled}
+      filter={null}
       onValueChange={(next: string | null) => {
         const choice = options.find((item) => item.label === next);
         if (choice) onChange(choice.value);
