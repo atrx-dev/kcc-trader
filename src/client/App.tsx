@@ -3,7 +3,7 @@ import { RotateCcw, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cardKey, type Card, type Catalog } from "../types.ts";
 import { VirtualGrid } from "./VirtualGrid.tsx";
-import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, byName, newestFirst, mostDesired, type CatalogSort, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, urlSearchFor, urlHasFilters, tradeViewFromPath, tradeViewHref, type TradeView, leaderboardByFromPath, leaderboardHref, type LeaderboardBy, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters, seenTradesKey, tradeSignature, readSeenTrades } from "./model.ts";
+import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, byName, newestFirst, mostDesired, type CatalogSort, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, catalogSortFromSearch, urlSearchFor, urlHasFilters, tradeViewFromPath, tradeViewHref, type TradeView, leaderboardByFromPath, leaderboardHref, type LeaderboardBy, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters, seenTradesKey, tradeSignature, readSeenTrades } from "./model.ts";
 import { CardFace } from "./components/cards.tsx";
 import { formatSyncedAt, AdminButton, Brand, NavTabs, AccountMenu, HelpButton, LeaderboardButton, TraderSearch } from "./components/header.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
@@ -35,7 +35,9 @@ const INITIAL_PAGE_FILTERS: Record<Page, Filters> = {
 
 export function App() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [catalogSort, setCatalogSort] = useState<CatalogSort>("rarity");
+  const [catalogSort, setCatalogSort] = useState<CatalogSort>(() =>
+    INITIAL_PAGE === "catalog" ? catalogSortFromSearch(window.location.search) : "rarity",
+  );
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [admin, setAdmin] = useState(false);
@@ -135,6 +137,7 @@ export function App() {
       setProfileId(profileIdFromPath(window.location.pathname));
       setQuery(state.query);
       setPageFilters((current) => ({ ...current, [next]: state.filters }));
+      if (next === "catalog") setCatalogSort(catalogSortFromSearch(window.location.search));
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -147,12 +150,12 @@ export function App() {
   }, [pageFilters.forTrade.owned]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const search = urlSearchFor(query, currentFilters);
+      const search = urlSearchFor(query, currentFilters, page === "catalog" ? catalogSort : undefined);
       if (search === window.location.search) return;
       window.history.replaceState(window.history.state, "", `${window.location.pathname}${search}${window.location.hash}`);
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [page, query, currentFilters]);
+  }, [page, query, currentFilters, catalogSort]);
 
   useEffect(() => {
     pendingChanges.current = [];
@@ -270,8 +273,12 @@ export function App() {
 
   function openPage(next: Page, href: string) {
     if (window.location.pathname !== href) {
-      window.history.replaceState(window.history.state, "", `${window.location.pathname}${urlSearchFor(query, currentFilters)}`);
-      window.history.pushState(null, "", `${href}${urlSearchFor("", pageFilters[next])}`);
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${urlSearchFor(query, currentFilters, page === "catalog" ? catalogSort : undefined)}`,
+      );
+      window.history.pushState(null, "", `${href}${urlSearchFor("", pageFilters[next], next === "catalog" ? catalogSort : undefined)}`);
     }
     setPage(next);
     setTradeView(tradeViewFromPath(href));
@@ -905,6 +912,8 @@ export function App() {
               onSort={(next) => {
                 if (next === catalogSort) return;
                 setCatalogSort(next);
+                const search = urlSearchFor(query, currentFilters, next);
+                window.history.replaceState(window.history.state, "", `${window.location.pathname}${search}${window.location.hash}`);
                 window.scrollTo({ top: 0 });
               }}
             />

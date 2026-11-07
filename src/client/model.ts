@@ -444,6 +444,11 @@ export const OWNED_PARAMS: Record<OwnedFilter, string | null> = {
   duplicates: "duplicates",
 };
 
+export function catalogSortFromSearch(search: string): CatalogSort {
+  const sort = new URLSearchParams(search).get("sort");
+  return sort === "name" || sort === "added" || sort === "desired" ? sort : "rarity";
+}
+
 export function readUrlState(search: string): { query: string; filters: Filters } {
   const params = new URLSearchParams(search);
   const facets = { ...NO_FACETS };
@@ -462,7 +467,7 @@ export function readUrlState(search: string): { query: string; filters: Filters 
   return { query: params.get("q") ?? "", filters: { facets, owned } };
 }
 
-export function urlSearchFor(query: string, filters: Filters): string {
+export function urlSearchFor(query: string, filters: Filters, sort?: CatalogSort): string {
   const params = new URLSearchParams();
   if (query.trim()) params.set("q", query.trim());
   for (const facet of FACETS) {
@@ -470,6 +475,7 @@ export function urlSearchFor(query: string, filters: Filters): string {
   }
   const owned = OWNED_PARAMS[filters.owned];
   if (owned) params.set("owned", owned);
+  if (sort && sort !== "rarity") params.set("sort", sort);
   const search = params.toString();
   return search ? `?${search}` : "";
 }
