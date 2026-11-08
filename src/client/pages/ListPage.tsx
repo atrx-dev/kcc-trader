@@ -104,25 +104,42 @@ export function ListPage({
     <>
       <section
         className={cn(
-          "flex items-center gap-4 rounded-[1.75rem] border border-white/10 px-5 py-4 md:px-8 md:py-5",
+          "flex flex-wrap items-center gap-x-4 gap-y-3 rounded-[1.75rem] border border-white/10 px-5 py-4 md:px-8 md:py-5",
           copy.glow,
         )}
       >
-        <span className={cn("grid size-11 shrink-0 place-items-center rounded-2xl", copy.bubble)}>
-          <Icon className="size-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h1 className="font-display text-2xl leading-tight font-extrabold tracking-tight md:text-3xl">{copy.title}</h1>
-          <p className="text-sm text-white/65">{copy.blurb}</p>
+        <div className="flex min-w-0 flex-1 items-center gap-4">
+          <span className={cn("grid size-11 shrink-0 place-items-center rounded-2xl", copy.bubble)}>
+            <Icon className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h1 className="font-display text-2xl leading-tight font-extrabold tracking-tight md:text-3xl">{copy.title}</h1>
+            <p className="text-sm text-white/65">{copy.blurb}</p>
+          </div>
         </div>
+        {user && list === "forTrade" ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                className="order-last w-full basis-full rounded-full bg-sky-300 text-sky-950 hover:bg-sky-200 md:order-none md:w-auto md:basis-auto"
+                onClick={() => setSkipsOpen(true)}
+              >
+                <Ban />
+                Manage skipped cards
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{skipNotice(listDuplicates, skippedCards.length)}</TooltipContent>
+          </Tooltip>
+        ) : null}
         {user ? (
-          <>
+          <div className="flex shrink-0 items-center gap-3">
             <ShareListsButton userId={user.id} className="hidden sm:inline-flex" />
-            <div className="shrink-0 text-right">
+            <div className="text-right">
               <p className="font-display text-3xl leading-none font-extrabold tabular-nums">{selected.length}</p>
               <p className="mt-1 text-xs text-white/60">{selected.length === 1 ? "card" : "cards"}</p>
             </div>
-          </>
+          </div>
         ) : null}
       </section>
 
@@ -206,19 +223,6 @@ export function ListPage({
           {unlistedDuplicates.length > 0 ? (
             <section className="rounded-3xl border border-sky-300/20 bg-sky-300/[0.06] px-4 py-3 md:px-5">
               {duplicateBanner}
-            </section>
-          ) : null}
-          {list === "forTrade" ? (
-            <section className="flex flex-wrap items-center gap-3 rounded-3xl border border-sky-300/20 bg-sky-300/[0.06] px-4 py-3 md:px-5">
-              <Ban className="size-5 shrink-0 text-sky-300" />
-              <p className="min-w-0 flex-1 text-sm text-white/75">{skipNotice(listDuplicates, skippedCards.length)}</p>
-              <Button
-                size="sm"
-                className="rounded-full bg-sky-300 text-sky-950 hover:bg-sky-200 whitespace-nowrap"
-                onClick={() => setSkipsOpen(true)}
-              >
-                Manage skipped cards
-              </Button>
             </section>
           ) : null}
 
