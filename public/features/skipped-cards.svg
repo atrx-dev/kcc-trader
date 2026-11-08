@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a2148"/>
+      <stop offset="1" stop-color="#221b3c"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="220" fill="url(#bg)"/>
+  <rect x="32" y="74" width="576" height="72" rx="36" fill="#7dd3fc" fill-opacity="0.08" stroke="#7dd3fc" stroke-opacity="0.28"/>
+  <circle cx="76" cy="110" r="11" stroke="#7dd3fc" stroke-width="2"/>
+  <path d="M68.5 117.5 83.5 102.5" stroke="#7dd3fc" stroke-width="2" stroke-linecap="round"/>
+  <text x="98" y="110" fill="#fff" fill-opacity="0.78" font-family="Segoe UI, sans-serif" font-size="14" font-weight="600" dominant-baseline="central">Leave cards out of duplicates listing.</text>
+  <rect x="408" y="90" width="180" height="40" rx="20" fill="#7dd3fc"/>
+  <text x="498" y="110" fill="#082f49" font-family="Segoe UI, sans-serif" font-size="13" font-weight="700" text-anchor="middle" dominant-baseline="central">Manage skipped cards</text>
+</svg>

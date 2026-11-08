@@ -81,8 +81,10 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
         <p>
           <strong className="font-semibold text-white">List duplicates for trade</strong> is off until you turn it on
           in Settings. While it's on, a sync puts new spare SS and SSS copies on For trade, and takes them off once you
-          no longer have a spare. Cards you add with List them follow the same rule. Cards you add yourself stay listed
-          for as long as you own them.
+          no longer have a spare. Cards you add with List them follow the same rule. Manage skipped cards, on For
+          trade, keeps chosen cards off duplicates listing, with that setting on or off. A card can
+          be skipped before it is a spare. If one was listed automatically, it comes off. Cards you add yourself stay
+          listed for as long as you own them.
         </p>
         <p>A card you no longer own always leaves For trade, however it was added.</p>
         <p>

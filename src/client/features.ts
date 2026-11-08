@@ -70,6 +70,12 @@ export const FEATURES: FeatureNote[] = [
     body: "A check in the corner marks a card you own. Turn Owned tags off in Settings to hide it.",
     image: "/features/owned-tags.svg",
   },
+  {
+    id: "skipped-cards",
+    title: "Skip a card",
+    body: "On For trade, Manage skipped cards keeps SS and SSS cards off duplicates listing. You can skip one before it is a spare.",
+    image: "/features/skipped-cards.svg",
+  },
 ];
 
 function newestFirst(notes: readonly FeatureNote[]): FeatureNote[] {

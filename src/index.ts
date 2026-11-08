@@ -263,10 +263,10 @@ export default {
 
         let rejected: string | null = null;
         const accepted: ListChange[] = [];
-        const needsOwned = changes.some((change) => change.list === "forTrade" && change.present);
+        const needsOwned = changes.some((change) => change.list === "forTrade" && change.present && change.skip !== true);
         const owned = needsOwned && user.profile ? await readOwned(env, user.profile.id, false).catch(() => null) : null;
         for (const change of changes) {
-          if (change.list !== "forTrade" || !change.present) accepted.push(change);
+          if (change.list !== "forTrade" || !change.present || change.skip === true) accepted.push(change);
           else if (!user.profile) rejected = "Link a public KCC profile to list cards for trade.";
           else if (!owned || owned.hidden) {
             rejected = "We couldn't read your KCC collection, so we can't check that you own these cards.";

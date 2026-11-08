@@ -27,6 +27,8 @@ export interface Lists {
   accepting?: boolean;
   pruneWishlist?: boolean;
   listDuplicates?: boolean;
+  auto?: string[];
+  skips?: string[];
 }
 
 export interface ListSync {
@@ -46,18 +48,46 @@ export interface ListChange {
   present: boolean;
   auto?: boolean;
   priority?: boolean;
+  skip?: boolean;
 }
 
 export const NO_LISTS: Lists = { forTrade: [], wishlist: [], priority: [] };
 export const LIST_SAVE_DELAY = 1200;
 
 export function withChanges(base: Lists, changes: ListChange[]): Lists {
-  const next: Lists = { ...base, priority: base.priority ? [...base.priority] : [] };
-  for (const { list, key, present, priority } of changes) {
+  const next: Lists = {
+    ...base,
+    priority: base.priority ? [...base.priority] : [],
+    auto: base.auto ? [...base.auto] : [],
+    skips: base.skips ? [...base.skips] : [],
+  };
+  for (const { list, key, present, priority, auto, skip } of changes) {
+    if (list === "forTrade" && skip !== undefined) {
+      next.skips = skip
+        ? next.skips!.includes(key)
+          ? next.skips
+          : [key, ...next.skips!]
+        : next.skips!.filter((item) => item !== key);
+      if (skip && (!present || next.auto!.includes(key))) {
+        next.forTrade = next.forTrade.filter((item) => item !== key);
+        next.auto = next.auto!.filter((item) => item !== key);
+      } else if (!skip && present && !next.forTrade.includes(key)) {
+        next.forTrade = [key, ...next.forTrade];
+        if (auto) next.auto = [key, ...next.auto!];
+      }
+      continue;
+    }
     const already = next[list].includes(key);
     if (!(present && priority !== undefined && already)) {
       const without = next[list].filter((item) => item !== key);
       next[list] = present ? [key, ...without] : without;
+    }
+    if (list === "forTrade") {
+      if (!present) next.auto = next.auto!.filter((item) => item !== key);
+      else if (auto) {
+        if (!next.auto!.includes(key)) next.auto = [key, ...next.auto!];
+        next.skips = next.skips!.filter((item) => item !== key);
+      }
     }
     if (list !== "wishlist") continue;
     if (!present || priority === false) next.priority = next.priority!.filter((item) => item !== key);

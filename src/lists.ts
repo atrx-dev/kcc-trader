@@ -4,6 +4,8 @@ export interface Lists {
   forTrade: string[];
   wishlist: string[];
   priority?: string[];
+  auto?: string[];
+  skips?: string[];
 }
 
 export interface Trader {
@@ -22,6 +24,7 @@ export interface ListChange {
   present: boolean;
   auto?: boolean;
   priority?: boolean;
+  skip?: boolean;
 }
 
 export interface Preferences {
@@ -60,6 +63,7 @@ interface EntryRow {
   list: ListName;
   card_key: string;
   priority?: number;
+  auto?: number;
 }
 
 const KEY_PATTERN = /^[0-9a-f-]{36}:(?:[0-9a-f-]{36})?:(?:Common|B|A|S|SS|SSS)$/i;
@@ -74,17 +78,19 @@ export function parseChanges(value: unknown): ListChange[] | null {
   const changes: ListChange[] = [];
   for (const item of value) {
     if (!item || typeof item !== "object") return null;
-    const { list, key, present, auto, priority } = item as Record<string, unknown>;
+    const { list, key, present, auto, priority, skip } = item as Record<string, unknown>;
     if (list !== "forTrade" && list !== "wishlist") return null;
     if (typeof key !== "string" || !KEY_PATTERN.test(key) || typeof present !== "boolean") return null;
     if (auto !== undefined && typeof auto !== "boolean") return null;
     if (priority !== undefined && (typeof priority !== "boolean" || list !== "wishlist")) return null;
+    if (skip !== undefined && (typeof skip !== "boolean" || list !== "forTrade")) return null;
     changes.push({
       list,
       key,
       present,
       auto: auto === true,
       ...(typeof priority === "boolean" ? { priority } : {}),
+      ...(typeof skip === "boolean" ? { skip } : {}),
     });
   }
   return changes;
@@ -265,23 +271,29 @@ function selectTrader(env: ListEnv, id: string): D1PreparedStatement {
 
 function selectEntries(env: ListEnv, id: string): D1PreparedStatement {
   return env.DB.prepare(
-    "SELECT list, card_key, priority FROM list_entries WHERE trader_id = ? ORDER BY added_at DESC",
+    "SELECT list, card_key, priority, auto FROM list_entries WHERE trader_id = ? ORDER BY added_at DESC",
   ).bind(id);
 }
 
+function selectSkips(env: ListEnv, id: string): D1PreparedStatement {
+  return env.DB.prepare("SELECT card_key FROM trade_skips WHERE trader_id = ?").bind(id);
+}
+
 function listsFrom(rows: EntryRow[]): Lists {
-  const lists: Lists = { forTrade: [], wishlist: [], priority: [] };
+  const lists: Lists = { forTrade: [], wishlist: [], priority: [], auto: [] };
   for (const row of rows) {
     lists[row.list].push(row.card_key);
     if (row.list === "wishlist" && row.priority) lists.priority!.push(row.card_key);
+    if (row.list === "forTrade" && row.auto) lists.auto!.push(row.card_key);
   }
   return lists;
 }
 
-function responseFrom(trader: D1Result, entries: D1Result): ListsResponse {
+function responseFrom(trader: D1Result, entries: D1Result, skips: D1Result): ListsResponse {
   const row = trader.results[0] as TraderRow | undefined;
   return {
     ...listsFrom(entries.results as unknown as EntryRow[]),
+    skips: (skips.results as { card_key: string }[]).map((skip) => skip.card_key),
     accepting: row?.accepting !== 0,
     pruneWishlist: row?.prune_wishlist !== 0,
     listDuplicates: row?.list_duplicates === 1,
@@ -289,13 +301,14 @@ function responseFrom(trader: D1Result, entries: D1Result): ListsResponse {
 }
 
 export async function readLists(env: ListEnv, trader: Trader): Promise<ListsResponse & { welcome: boolean }> {
-  const [, row, entries] = await env.DB.batch([
+  const [, row, entries, skips] = await env.DB.batch([
     saveTrader(env, trader),
     selectTrader(env, trader.id),
     selectEntries(env, trader.id),
+    selectSkips(env, trader.id),
   ]);
   const stored = row.results[0] as TraderRow | undefined;
-  return { ...responseFrom(row, entries), welcome: stored?.introduced === 0 };
+  return { ...responseFrom(row, entries, skips), welcome: stored?.introduced === 0 };
 }
 
 export function markIntroduced(env: ListEnv, traderId: string): Promise<D1Result> {
@@ -307,22 +320,27 @@ export async function setPreferences(
   trader: Trader,
   preferences: Partial<Preferences>,
 ): Promise<ListsResponse> {
-  const [, row, entries] = await env.DB.batch([
+  const [, row, entries, skips] = await env.DB.batch([
     saveTrader(env, trader, preferences),
     selectTrader(env, trader.id),
     selectEntries(env, trader.id),
+    selectSkips(env, trader.id),
   ]);
-  return responseFrom(row, entries);
+  return responseFrom(row, entries, skips);
 }
 
 export async function readPublicLists(
   env: ListEnv,
   userId: string,
 ): Promise<(Lists & { accepting: boolean; trader: Trader }) | null> {
-  const [row, entries] = await env.DB.batch([selectTrader(env, userId), selectEntries(env, userId)]);
+  const [row, entries, skips] = await env.DB.batch([
+    selectTrader(env, userId),
+    selectEntries(env, userId),
+    selectSkips(env, userId),
+  ]);
   const trader = row.results[0] as TraderRow | undefined;
   if (!trader) return null;
-  const { pruneWishlist: _, listDuplicates: __, ...lists } = responseFrom(row, entries);
+  const { pruneWishlist: _, listDuplicates: __, auto: ___, skips: ____, ...lists } = responseFrom(row, entries, skips);
   return { ...lists, trader: traderFromRow(trader) };
 }
 
@@ -333,22 +351,24 @@ export async function syncLists(
   duplicates: string[],
   newDuplicates: string[],
 ): Promise<ListSync> {
-  const [traderResult, entryResult] = await env.DB.batch([
+  const [traderResult, entryResult, skipResult] = await env.DB.batch([
     env.DB.prepare("SELECT prune_wishlist, list_duplicates FROM traders WHERE id = ?").bind(traderId),
     env.DB.prepare("SELECT list, card_key, auto FROM list_entries WHERE trader_id = ?").bind(traderId),
+    env.DB.prepare("SELECT card_key FROM trade_skips WHERE trader_id = ?").bind(traderId),
   ]);
   const trader = traderResult.results[0] as Pick<TraderRow, "prune_wishlist" | "list_duplicates"> | undefined;
   const sync: ListSync = { removed: { forTrade: [], wishlist: [] }, unlisted: [], added: [] };
   if (!trader) return sync;
 
   const spare = new Set(duplicates);
+  const skipped = new Set((skipResult.results as { card_key: string }[]).map((row) => row.card_key));
   const listed = new Set<string>();
   for (const { list, card_key: key, auto } of entryResult.results as unknown as (EntryRow & { auto: number })[]) {
     if (list === "wishlist") {
       if (trader.prune_wishlist !== 0 && owns(key)) sync.removed.wishlist.push(key);
     } else if (!owns(key)) {
       sync.removed.forTrade.push(key);
-    } else if (auto && trader.list_duplicates && !spare.has(key)) {
+    } else if (auto && (skipped.has(key) || (trader.list_duplicates && !spare.has(key)))) {
       sync.unlisted.push(key);
     } else {
       listed.add(key);
@@ -356,7 +376,7 @@ export async function syncLists(
   }
   if (trader.list_duplicates) {
     const room = Math.max(0, MAX_PER_LIST - listed.size);
-    sync.added = newDuplicates.filter((key) => !listed.has(key)).slice(0, room);
+    sync.added = newDuplicates.filter((key) => !listed.has(key) && !skipped.has(key)).slice(0, room);
   }
 
   const writes = [
@@ -388,13 +408,35 @@ export async function changeLists(
 ): Promise<ListsResponse & { full: boolean }> {
   const existing = listsFrom((await selectEntries(env, trader.id).all<EntryRow>()).results);
   const members = { forTrade: new Set(existing.forTrade), wishlist: new Set(existing.wishlist) };
+  const autoKeys = new Set(existing.auto ?? []);
   const now = Date.now();
   const writes: D1PreparedStatement[] = [saveTrader(env, trader)];
   let full = false;
 
-  changes.forEach(({ list, key, present, auto, priority }, index) => {
+  changes.forEach(({ list, key, present, auto, priority, skip }, index) => {
+    if (list === "forTrade" && skip === true) {
+      writes.push(
+        env.DB.prepare("INSERT OR IGNORE INTO trade_skips (trader_id, card_key) VALUES (?, ?)").bind(trader.id, key),
+      );
+      if (!present || autoKeys.has(key)) {
+        autoKeys.delete(key);
+        members.forTrade.delete(key);
+        writes.push(
+          env.DB.prepare("DELETE FROM list_entries WHERE trader_id = ? AND list = 'forTrade' AND card_key = ?").bind(
+            trader.id,
+            key,
+          ),
+        );
+      }
+      return;
+    }
+    if (list === "forTrade" && skip === false && (!present || members.forTrade.has(key))) {
+      writes.push(env.DB.prepare("DELETE FROM trade_skips WHERE trader_id = ? AND card_key = ?").bind(trader.id, key));
+      return;
+    }
     if (!present) {
       members[list].delete(key);
+      if (list === "forTrade") autoKeys.delete(key);
       writes.push(
         env.DB.prepare("DELETE FROM list_entries WHERE trader_id = ? AND list = ? AND card_key = ?").bind(
           trader.id,
@@ -420,21 +462,30 @@ export async function changeLists(
       return;
     }
     members[list].add(key);
+    const automatic = list === "forTrade" && auto ? 1 : 0;
+    if (list === "forTrade") {
+      if (automatic) autoKeys.add(key);
+      else autoKeys.delete(key);
+    }
+    if (list === "forTrade" && (automatic || skip === false)) {
+      writes.push(env.DB.prepare("DELETE FROM trade_skips WHERE trader_id = ? AND card_key = ?").bind(trader.id, key));
+    }
     writes.push(
       env.DB.prepare(
         `INSERT INTO list_entries (trader_id, list, card_key, added_at, auto, priority) VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT (trader_id, list, card_key) DO UPDATE SET added_at = excluded.added_at, auto = excluded.auto`,
-      ).bind(
-        trader.id,
-        list,
-        key,
-        now + index,
-        list === "forTrade" && auto ? 1 : 0,
-        list === "wishlist" && priority ? 1 : 0,
-      ),
+      ).bind(trader.id, list, key, now + index, automatic, list === "wishlist" && priority ? 1 : 0),
     );
   });
 
-  const results = await env.DB.batch([...writes, selectTrader(env, trader.id), selectEntries(env, trader.id)]);
-  return { ...responseFrom(results[results.length - 2], results[results.length - 1]), full };
+  const results = await env.DB.batch([
+    ...writes,
+    selectTrader(env, trader.id),
+    selectEntries(env, trader.id),
+    selectSkips(env, trader.id),
+  ]);
+  return {
+    ...responseFrom(results[results.length - 3], results[results.length - 2], results[results.length - 1]),
+    full,
+  };
 }

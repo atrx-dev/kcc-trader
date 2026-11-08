@@ -352,11 +352,14 @@ export function App() {
     const goneWishlist = new Set(removed.wishlist);
     const saved = savedLists.current;
     const keptForTrade = saved.forTrade.filter((key) => !goneForTrade.has(key));
+    const auto = (saved.auto ?? []).filter((key) => !goneForTrade.has(key));
+    for (const key of added) if (!auto.includes(key)) auto.unshift(key);
     receiveLists({
       ...saved,
       forTrade: [...added.filter((key) => !keptForTrade.includes(key)), ...keptForTrade],
       wishlist: saved.wishlist.filter((key) => !goneWishlist.has(key)),
       priority: (saved.priority ?? []).filter((key) => !goneWishlist.has(key)),
+      auto,
     });
     setListsSaved((version) => version + 1);
 
@@ -395,7 +398,8 @@ export function App() {
   }
 
   function toggle(list: ListName, key: string, present: boolean, auto = false) {
-    queueChange({ list, key, present, ...(auto ? { auto: true } : {}) });
+    const keepSkip = list === "forTrade" && !present && (lists.skips ?? []).includes(key);
+    queueChange({ list, key, present, ...(auto ? { auto: true } : {}), ...(keepSkip ? { skip: true } : {}) });
   }
 
   function setPriority(key: string, priority: boolean) {
@@ -565,11 +569,38 @@ export function App() {
   const listView = listName ? applyFilters(selected, listFilters, owned, "") : null;
   const listOptions = listName ? facetOptionsFor(selected) : null;
   const ownedReady = owned.status === "ready";
+  const skipKeys = useMemo(() => new Set(lists.skips ?? []), [lists.skips]);
+  const skippableCards = useMemo(() => {
+    if (page !== "forTrade") return [];
+    return cards.filter((card) => card.rank === "SS" || card.rank === "SSS");
+  }, [page, cards]);
+  const skippedCards = useMemo(
+    () => (page === "forTrade" ? cardsInCatalogOrder(lists.skips ?? [], byKey) : []),
+    [page, lists.skips, byKey],
+  );
   const unlistedDuplicates = useMemo(() => {
     if (page !== "forTrade" || !ownedReady) return [];
     const listed = new Set(lists.forTrade);
-    return cards.filter((card) => isDuplicate(card, owned) && !listed.has(cardKey(card)));
-  }, [page, ownedReady, owned, cards, lists.forTrade]);
+    return cards.filter(
+      (card) => isDuplicate(card, owned) && !listed.has(cardKey(card)) && !skipKeys.has(cardKey(card)),
+    );
+  }, [page, ownedReady, owned, cards, lists.forTrade, skipKeys]);
+  function setSkip(key: string, skip: boolean) {
+    const card = byKey.get(key);
+    const listNow =
+      !skip &&
+      lists.listDuplicates === true &&
+      !lists.forTrade.includes(key) &&
+      card !== undefined &&
+      isDuplicate(card, owned);
+    queueChange({
+      list: "forTrade",
+      key,
+      present: skip ? true : listNow,
+      skip,
+      ...(listNow ? { auto: true } : {}),
+    });
+  }
   const needsPublicProfile = Boolean(
     user &&
       owned.status !== "ready" &&
@@ -848,6 +879,10 @@ export function App() {
             priority={priorityKeys}
             onPriority={setPriority}
             unlistedDuplicates={unlistedDuplicates}
+            listDuplicates={lists.listDuplicates === true}
+            skippedCards={skippedCards}
+            candidates={skippableCards}
+            onSkip={setSkip}
             owned={owned}
             ownedMarks={settings.ownedMarks}
             wanted={settings.wishlistMarks ? wantedBy : undefined}
