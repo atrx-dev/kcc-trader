@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { isNewCard, type Card } from "../../types.ts";
 import { frameUrl, hasFrame, namePlateStyle } from "../frame.ts";
 import { KccChanHolo } from "./kcc-chan-holo.tsx";
+import { isStandardShineBorder, StandardBorderShine } from "./standard-border-shine.tsx";
 
 export const SSS_STARS = [
   [9, 12], [82, 8], [24, 31], [69, 23], [94, 41], [14, 58],
@@ -55,6 +56,7 @@ export function FoilCard({ card, children }: { card: Card; children: ReactNode }
   const kccChan = finish === "kcc-chan";
   const border = card.border || "starry";
   const halloween = border.startsWith("halloween-");
+  const standardShine = isStandardShineBorder(border);
   const stars = besties ? BESTIES_STARS : SSS_STARS;
   return (
     <div className="foil-stage">
@@ -73,6 +75,8 @@ export function FoilCard({ card, children }: { card: Card; children: ReactNode }
         {children}
         {kccChan ? (
           <KccChanHolo />
+        ) : standardShine ? (
+          <StandardBorderShine border={border} />
         ) : (
           <div className="foil-treatment" aria-hidden="true">
             <div className="foil-color" />

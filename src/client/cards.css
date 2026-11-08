@@ -38,7 +38,8 @@
 }
 
 .virtual-grid[data-scrolling] .foil-treatment,
-.virtual-grid[data-scrolling] .kcc-holo-layer {
+.virtual-grid[data-scrolling] .kcc-holo-layer,
+.virtual-grid[data-scrolling] .standard-border-shine {
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -228,6 +229,32 @@
 .framed-card:is([data-sss-border="noir"], [data-sss-border="red-luxury"]) footer span {
   color: #f5f5f5;
   text-shadow: 0 1px 2px #000;
+}
+
+.framed-card:is(
+  [data-sss-border="cobalt"],
+  [data-sss-border="sovereign"],
+  [data-sss-border="glitch"],
+  [data-sss-border="duality"],
+  [data-sss-border="emerald"]
+) footer,
+.framed-card:is(
+  [data-sss-border="cobalt"],
+  [data-sss-border="sovereign"],
+  [data-sss-border="glitch"],
+  [data-sss-border="duality"],
+  [data-sss-border="emerald"]
+) footer span {
+  color: #fff;
+  text-shadow: 0 1px 2px #000;
+}
+
+.framed-card[data-sss-border="glitch"] footer span {
+  text-shadow:
+    -1px -1px #10121b,
+    1px -1px #10121b,
+    -1px 1px #10121b,
+    1px 1px #10121b;
 }
 
 .framed-card[data-sss-border^="halloween-"] footer,
@@ -592,7 +619,8 @@
   50% { opacity: 1; transform: scale(1); }
 }
 
-.kcc-holo-layer {
+.kcc-holo-layer,
+.standard-border-shine {
   pointer-events: none;
   z-index: 3;
   border-radius: 5px;
@@ -612,8 +640,13 @@
   opacity: 0.9;
 }
 
+.standard-border-shine {
+  mix-blend-mode: screen;
+}
+
 [data-no-card-effects] .foil-treatment,
-[data-no-card-effects] .kcc-holo-layer {
+[data-no-card-effects] .kcc-holo-layer,
+[data-no-card-effects] .standard-border-shine {
   display: none;
 }
 

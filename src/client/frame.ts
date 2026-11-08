@@ -2,6 +2,13 @@ import type { Card } from "../types.ts";
 
 const BORDERLESS = new Set(["besties", "kcc-chan"]);
 
+export const STANDARD_SHINE_BORDERS = ["sunburst", "cobalt", "sovereign", "glitch", "duality", "emerald"] as const;
+export type StandardShineBorder = (typeof STANDARD_SHINE_BORDERS)[number];
+
+export function isStandardShineBorder(border: string): border is StandardShineBorder {
+  return (STANDARD_SHINE_BORDERS as readonly string[]).includes(border);
+}
+
 export function hasFrame(card: Pick<Card, "name" | "variantName" | "eventName" | "fullCard">): boolean {
   if (card.fullCard) return false;
   for (const part of [card.name, card.variantName, card.eventName]) {
@@ -19,7 +26,7 @@ const RANK_FRAMES: Record<string, string> = {
   SSS: "/frames/sss.webp",
 };
 
-const HALLOWEEN_INSET: Record<string, number> = {
+const NAME_PLATE_INSET: Record<string, number> = {
   "halloween-1": 272,
   "halloween-2": 286,
   "halloween-3": 280,
@@ -30,13 +37,23 @@ const HALLOWEEN_INSET: Record<string, number> = {
   "halloween-8": 298,
   "halloween-9": 285,
   "halloween-10": 314,
+  sunburst: 280,
+  cobalt: 310,
+  sovereign: 320,
+  glitch: 300,
+  duality: 258,
+  emerald: 280,
 };
+
+function isPngBorder(border: string): boolean {
+  return border.startsWith("halloween-") || isStandardShineBorder(border);
+}
 
 function framePath(card: Card): string {
   if (card.rank !== "SSS") return RANK_FRAMES[card.rank] ?? RANK_FRAMES.Common;
   const border = card.border || "starry";
   if (border === "starry") return "/frames/sss.webp";
-  const extension = border.startsWith("halloween-") ? "png" : "webp";
+  const extension = isPngBorder(border) ? "png" : "webp";
   return `/frames/sss-${border}.${extension}`;
 }
 
@@ -47,7 +64,7 @@ export function frameUrl(card: Card): string {
 export function namePlateStyle(card: Card): { left: string; width: string } | undefined {
   if (card.rank !== "SSS") return undefined;
   const border = card.border || "starry";
-  const raw = HALLOWEEN_INSET[border] ?? (border === "starry" ? 240 : 258);
+  const raw = NAME_PLATE_INSET[border] ?? (border === "starry" ? 240 : 258);
   const inset = raw / 6;
   return { left: `${inset}%`, width: `${97 - inset}%` };
 }
