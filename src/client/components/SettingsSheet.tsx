@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { type Card } from "../../types.ts";
 import { type OwnedState, type FacetId, FACETS, type Filters, NO_FILTERS, type Settings, applyFilters } from "../model.ts";
-import { FacetFilter, OwnedToggle, Switch } from "./controls.tsx";
+import { FacetFilter, OwnedToggle, SortToggle, Switch } from "./controls.tsx";
 
 export function SettingsSheet({
   settings,
@@ -281,6 +281,21 @@ export function SettingsSheet({
                   );
                 })}
               </div>
+            </section>
+
+            <section className="flex flex-col gap-3">
+              <div>
+                <h4 className="font-display text-base font-bold">Default catalog sort</h4>
+                <p className="text-sm text-white/60">
+                  Applied whenever you open the catalog without a sort in the link.
+                </p>
+              </div>
+              <SortToggle
+                field
+                value={settings.catalogSort}
+                defaultValue="rarity"
+                onChange={(catalogSort) => onChange({ ...settings, catalogSort })}
+              />
             </section>
 
             <section className="flex flex-col gap-3">

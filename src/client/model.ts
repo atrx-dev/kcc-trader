@@ -200,9 +200,12 @@ export const NO_PAGE_FILTERS: Record<Page, Filters> = {
   admin: NO_FILTERS,
 };
 
+export type CatalogSort = "rarity" | "added" | "name" | "desired";
+
 export interface Settings {
   hiddenRarities: string[];
   catalogDefaults: Filters;
+  catalogSort: CatalogSort;
   cardEffects: boolean;
   featureNotes: boolean;
   wishlistMarks: boolean;
@@ -213,11 +216,16 @@ export const SETTINGS_KEY = "kcc-trader:settings";
 export const DEFAULT_SETTINGS: Settings = {
   hiddenRarities: [],
   catalogDefaults: NO_FILTERS,
+  catalogSort: "rarity",
   cardEffects: false,
   featureNotes: true,
   wishlistMarks: true,
   ownedMarks: true,
 };
+
+export function isCatalogSort(value: unknown): value is CatalogSort {
+  return value === "rarity" || value === "added" || value === "name" || value === "desired";
+}
 
 export function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
@@ -228,6 +236,7 @@ export function loadSettings(): Settings {
     const raw = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? "null") as {
       hiddenRarities?: unknown;
       catalogDefaults?: { facets?: Partial<Record<FacetId, unknown>>; owned?: unknown; duplicates?: unknown };
+      catalogSort?: unknown;
       cardEffects?: unknown;
       featureNotes?: unknown;
       wishlistMarks?: unknown;
@@ -248,6 +257,7 @@ export function loadSettings(): Settings {
               ? "duplicates"
               : "all",
       },
+      catalogSort: isCatalogSort(raw.catalogSort) ? raw.catalogSort : DEFAULT_SETTINGS.catalogSort,
       cardEffects: raw.cardEffects === true,
       featureNotes: raw.featureNotes !== false,
       wishlistMarks: raw.wishlistMarks !== false,
@@ -332,8 +342,6 @@ export function isOwned(card: Card, owned: OwnedState): boolean {
   if (card.rank === "SS") return owned.ss.has(card.variantId ? `${card.id}:${card.variantId}` : card.id);
   return false;
 }
-
-export type CatalogSort = "rarity" | "added" | "name" | "desired";
 
 export function byName(cards: readonly Card[]): Card[] {
   return [...cards].sort(
@@ -474,9 +482,9 @@ export const OWNED_PARAMS: Record<OwnedFilter, string | null> = {
   duplicates: "duplicates",
 };
 
-export function catalogSortFromSearch(search: string): CatalogSort {
+export function catalogSortFromSearch(search: string, fallback: CatalogSort = "rarity"): CatalogSort {
   const sort = new URLSearchParams(search).get("sort");
-  return sort === "name" || sort === "added" || sort === "desired" ? sort : "rarity";
+  return isCatalogSort(sort) ? sort : fallback;
 }
 
 export function readUrlState(search: string): { query: string; filters: Filters } {
@@ -497,7 +505,12 @@ export function readUrlState(search: string): { query: string; filters: Filters 
   return { query: params.get("q") ?? "", filters: { facets, owned } };
 }
 
-export function urlSearchFor(query: string, filters: Filters, sort?: CatalogSort): string {
+export function urlSearchFor(
+  query: string,
+  filters: Filters,
+  sort?: CatalogSort,
+  defaultSort: CatalogSort = "rarity",
+): string {
   const params = new URLSearchParams();
   if (query.trim()) params.set("q", query.trim());
   for (const facet of FACETS) {
@@ -505,7 +518,7 @@ export function urlSearchFor(query: string, filters: Filters, sort?: CatalogSort
   }
   const owned = OWNED_PARAMS[filters.owned];
   if (owned) params.set("owned", owned);
-  if (sort && sort !== "rarity") params.set("sort", sort);
+  if (sort && sort !== defaultSort) params.set("sort", sort);
   const search = params.toString();
   return search ? `?${search}` : "";
 }

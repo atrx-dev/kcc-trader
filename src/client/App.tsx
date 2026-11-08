@@ -36,7 +36,9 @@ const INITIAL_PAGE_FILTERS: Record<Page, Filters> = {
 export function App() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [catalogSort, setCatalogSort] = useState<CatalogSort>(() =>
-    INITIAL_PAGE === "catalog" ? catalogSortFromSearch(window.location.search) : "rarity",
+    INITIAL_PAGE === "catalog"
+      ? catalogSortFromSearch(window.location.search, INITIAL_SETTINGS.catalogSort)
+      : INITIAL_SETTINGS.catalogSort,
   );
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -137,11 +139,11 @@ export function App() {
       setProfileId(profileIdFromPath(window.location.pathname));
       setQuery(state.query);
       setPageFilters((current) => ({ ...current, [next]: state.filters }));
-      if (next === "catalog") setCatalogSort(catalogSortFromSearch(window.location.search));
+      if (next === "catalog") setCatalogSort(catalogSortFromSearch(window.location.search, settings.catalogSort));
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, []);
+  }, [settings.catalogSort]);
 
   const currentFilters = pageFilters[page];
   useEffect(() => {
@@ -150,12 +152,17 @@ export function App() {
   }, [pageFilters.forTrade.owned]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const search = urlSearchFor(query, currentFilters, page === "catalog" ? catalogSort : undefined);
+      const search = urlSearchFor(
+        query,
+        currentFilters,
+        page === "catalog" ? catalogSort : undefined,
+        settings.catalogSort,
+      );
       if (search === window.location.search) return;
       window.history.replaceState(window.history.state, "", `${window.location.pathname}${search}${window.location.hash}`);
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [page, query, currentFilters, catalogSort]);
+  }, [page, query, currentFilters, catalogSort, settings.catalogSort]);
 
   useEffect(() => {
     pendingChanges.current = [];
@@ -276,9 +283,13 @@ export function App() {
       window.history.replaceState(
         window.history.state,
         "",
-        `${window.location.pathname}${urlSearchFor(query, currentFilters, page === "catalog" ? catalogSort : undefined)}`,
+        `${window.location.pathname}${urlSearchFor(query, currentFilters, page === "catalog" ? catalogSort : undefined, settings.catalogSort)}`,
       );
-      window.history.pushState(null, "", `${href}${urlSearchFor("", pageFilters[next], next === "catalog" ? catalogSort : undefined)}`);
+      window.history.pushState(
+        null,
+        "",
+        `${href}${urlSearchFor("", pageFilters[next], next === "catalog" ? catalogSort : undefined, settings.catalogSort)}`,
+      );
     }
     setPage(next);
     setTradeView(tradeViewFromPath(href));
@@ -496,6 +507,7 @@ export function App() {
     const cleaned: Settings = {
       hiddenRarities: next.hiddenRarities,
       catalogDefaults: withoutRarities(next.catalogDefaults, next.hiddenRarities),
+      catalogSort: next.catalogSort,
       cardEffects: next.cardEffects,
       featureNotes: next.featureNotes,
       wishlistMarks: next.wishlistMarks,
@@ -503,6 +515,7 @@ export function App() {
     };
     setSettings(cleaned);
     window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(cleaned));
+    if (cleaned.catalogSort !== settings.catalogSort) setCatalogSort(cleaned.catalogSort);
     setPageFilters((current) => ({
       ...current,
       catalog:
@@ -944,10 +957,11 @@ export function App() {
               query={query}
               onClearQuery={() => setQuery("")}
               sort={catalogSort}
+              defaultSort={settings.catalogSort}
               onSort={(next) => {
                 if (next === catalogSort) return;
                 setCatalogSort(next);
-                const search = urlSearchFor(query, currentFilters, next);
+                const search = urlSearchFor(query, currentFilters, next, settings.catalogSort);
                 window.history.replaceState(window.history.state, "", `${window.location.pathname}${search}${window.location.hash}`);
                 window.scrollTo({ top: 0 });
               }}

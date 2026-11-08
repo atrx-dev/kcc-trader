@@ -185,13 +185,15 @@ export function SortToggle({
   value,
   onChange,
   field = false,
+  defaultValue = "rarity",
 }: {
   value: CatalogSort;
   onChange: (value: CatalogSort) => void;
   field?: boolean;
+  defaultValue?: CatalogSort;
 }) {
   const current = SORT_CHOICES.find((choice) => choice.value === value) ?? SORT_CHOICES[0];
-  const custom = value !== "rarity";
+  const custom = value !== defaultValue;
   return (
     <Combobox
       items={SORT_CHOICES.map((choice) => choice.label)}
@@ -391,6 +393,7 @@ export function FilterBar({
   onClearQuery,
   sort,
   onSort,
+  defaultSort = "rarity",
   noun = "cards",
   showCount = true,
 }: {
@@ -406,6 +409,7 @@ export function FilterBar({
   onClearQuery?: () => void;
   sort?: CatalogSort;
   onSort?: (sort: CatalogSort) => void;
+  defaultSort?: CatalogSort;
   noun?: string;
   showCount?: boolean;
 }) {
@@ -443,7 +447,7 @@ export function FilterBar({
           {sort && onSort ? (
             <label className="col-span-2 flex min-w-0 flex-col gap-1">
               <FieldLabel>Sort</FieldLabel>
-              <SortToggle field value={sort} onChange={onSort} />
+              <SortToggle field value={sort} onChange={onSort} defaultValue={defaultSort} />
             </label>
           ) : null}
           {ownedControls ? (
@@ -479,7 +483,7 @@ export function FilterBar({
         ))}
         {ownedControls || onSort ? (
           <div className="ml-auto flex items-center gap-1">
-            {sort && onSort ? <SortToggle value={sort} onChange={onSort} /> : null}
+            {sort && onSort ? <SortToggle value={sort} onChange={onSort} defaultValue={defaultSort} /> : null}
             {ownedControls ? (
               <>
                 <OwnedToggle
