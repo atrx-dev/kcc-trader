@@ -60,6 +60,7 @@ export function ListPage({
   const copy = LIST_COPY[list];
   const Icon = copy.icon;
   const searching = query.trim().length > 0;
+  const showOwned = list !== "forTrade" && ownedMarks;
 
   return (
     <>
@@ -142,7 +143,7 @@ export function ListPage({
                     const already = selectedKeys.includes(key);
                     return (
                       <>
-                        <CardFace card={card} copies={duplicateCount(card, owned)} owned={ownedMarks && isOwned(card, owned)} />
+                        <CardFace card={card} copies={duplicateCount(card, owned)} owned={showOwned && isOwned(card, owned)} />
                         <Button
                           className="h-[34px] rounded-full"
                           variant={already ? "secondary" : "default"}
@@ -217,7 +218,7 @@ export function ListPage({
                     <CardFace
                       card={card}
                       copies={duplicateCount(card, owned)}
-                      owned={ownedMarks && isOwned(card, owned)}
+                      owned={showOwned && isOwned(card, owned)}
                       priority={starred}
                       wanted={wanted?.get(key) ?? 0}
                     />

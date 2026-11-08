@@ -116,7 +116,7 @@ export function TraderMatch({
           <MatchCards title="They have, you want" cards={theyHave} tone="bg-rose-300" owned={owned} ownedMarks={ownedMarks} priority={priority} />
         ) : null}
         {theyWant.length > 0 ? (
-          <MatchCards title="You have, they want" cards={theyWant} tone="bg-sky-300" owned={owned} ownedMarks={ownedMarks} priority={priority} />
+          <MatchCards title="You have, they want" cards={theyWant} tone="bg-sky-300" owned={owned} ownedMarks={false} priority={priority} />
         ) : null}
       </div>
     </article>

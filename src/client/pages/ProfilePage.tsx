@@ -296,7 +296,7 @@ export function ProfilePage({
             highlightLabel="On your wishlist"
             empty={filtering && forTrade.length > 0 ? "No cards for trade match your filters." : "Nothing listed for trade."}
             owned={owned}
-            ownedMarks={ownedMarks}
+            ownedMarks={own ? false : ownedMarks}
           />
           <ProfileSection
             id="wishlist"
