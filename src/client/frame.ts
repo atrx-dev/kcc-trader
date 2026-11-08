@@ -1,8 +1,9 @@
 import type { Card } from "../types.ts";
 
-const BORDERLESS = new Set(["besties"]);
+const BORDERLESS = new Set(["besties", "kcc-chan"]);
 
-export function hasFrame(card: Pick<Card, "name" | "variantName" | "eventName">): boolean {
+export function hasFrame(card: Pick<Card, "name" | "variantName" | "eventName" | "fullCard">): boolean {
+  if (card.fullCard) return false;
   for (const part of [card.name, card.variantName, card.eventName]) {
     if (part && BORDERLESS.has(part.toLowerCase())) return false;
   }

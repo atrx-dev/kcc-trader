@@ -530,7 +530,13 @@ export function cardTypeLabel(card: Card): string {
   ) {
     return "Halloween event";
   }
-  if (card.game.trim().toLowerCase() === "promos") return "Promo";
+  if (
+    card.game.trim().toLowerCase() === "promos" ||
+    card.holo === "kcc-chan" ||
+    card.name.trim().toLowerCase() === "kcc-chan"
+  ) {
+    return "Promo";
+  }
   if (card.hidden) return "Hidden";
   return "Character";
 }

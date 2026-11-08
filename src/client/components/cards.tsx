@@ -3,6 +3,7 @@ import { Check, Copy, Heart, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isNewCard, type Card } from "../../types.ts";
 import { frameUrl, hasFrame, namePlateStyle } from "../frame.ts";
+import { KccChanHolo } from "./kcc-chan-holo.tsx";
 
 export const SSS_STARS = [
   [9, 12], [82, 8], [24, 31], [69, 23], [94, 41], [14, 58],
@@ -13,9 +14,23 @@ export const BESTIES_STARS = [
   [6, 10], [92, 14], [14, 69], [86, 57], [5, 89], [94, 82], [22, 92], [80, 94],
 ] as const;
 
+function cardLabel(card: Card): string {
+  return `${card.name} ${card.eventName ?? ""} ${card.variantName ?? ""}`.toLowerCase();
+}
+
 export function isBesties(card: Card): boolean {
-  const name = `${card.eventName ?? ""} ${card.variantName ?? ""}`.toLowerCase();
-  return name.includes("besties");
+  return card.holo === "besties" || cardLabel(card).includes("besties");
+}
+
+export function isKccChan(card: Card): boolean {
+  return card.holo === "kcc-chan" || cardLabel(card).includes("kcc-chan");
+}
+
+export function cardFinish(card: Card): string | undefined {
+  if (card.holo) return card.holo;
+  if (isKccChan(card)) return "kcc-chan";
+  if (isBesties(card)) return "besties";
+  return undefined;
 }
 
 export function tiltFoil(event: ReactPointerEvent<HTMLDivElement>) {
@@ -35,7 +50,9 @@ export function resetFoil(event: ReactPointerEvent<HTMLDivElement>) {
 }
 
 export function FoilCard({ card, children }: { card: Card; children: ReactNode }) {
-  const besties = isBesties(card);
+  const finish = cardFinish(card);
+  const besties = finish === "besties";
+  const kccChan = finish === "kcc-chan";
   const border = card.border || "starry";
   const halloween = border.startsWith("halloween-");
   const stars = besties ? BESTIES_STARS : SSS_STARS;
@@ -44,7 +61,7 @@ export function FoilCard({ card, children }: { card: Card; children: ReactNode }
       <div
         className="foil-sample"
         data-tier={besties ? "SS" : card.rank}
-        data-holo={besties ? "besties" : card.rank === "SSS" ? border : undefined}
+        data-holo={finish ?? (card.rank === "SSS" ? border : undefined)}
         data-frame-only={halloween ? "true" : "false"}
         style={{
           ["--foil-strength" as string]: halloween ? 0.36 : 0.8,
@@ -54,28 +71,32 @@ export function FoilCard({ card, children }: { card: Card; children: ReactNode }
         onPointerLeave={resetFoil}
       >
         {children}
-        <div className="foil-treatment" aria-hidden="true">
-          <div className="foil-color" />
-          <div className="foil-grain" />
-          <div className="foil-sweep" />
-          <div className="foil-glare" />
-          {card.rank === "SSS" ? (
-            <div className="foil-stars">
-              {stars.map(([left, top], index) => (
-                <i
-                  key={`${left}-${top}`}
-                  style={{
-                    left: `${left}%`,
-                    top: `${top}%`,
-                    animationDelay: `-${index * 0.47}s`,
-                    width: index % 3 === 0 ? 16 : 9,
-                    height: index % 3 === 0 ? 16 : 9,
-                  }}
-                />
-              ))}
-            </div>
-          ) : null}
-        </div>
+        {kccChan ? (
+          <KccChanHolo />
+        ) : (
+          <div className="foil-treatment" aria-hidden="true">
+            <div className="foil-color" />
+            <div className="foil-grain" />
+            <div className="foil-sweep" />
+            <div className="foil-glare" />
+            {card.rank === "SSS" || besties ? (
+              <div className="foil-stars">
+                {stars.map(([left, top], index) => (
+                  <i
+                    key={`${left}-${top}`}
+                    style={{
+                      left: `${left}%`,
+                      top: `${top}%`,
+                      animationDelay: `-${index * 0.47}s`,
+                      width: index % 3 === 0 ? 16 : 9,
+                      height: index % 3 === 0 ? 16 : 9,
+                    }}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -175,7 +196,11 @@ export function CardFace({
   const framed = hasFrame(card);
   const face = (
     <div
-      className={holo ? "card framed-card foil" : "card framed-card"}
+      className={cn(
+        "card",
+        framed ? "framed-card" : "full-art-card",
+        holo && "foil",
+      )}
       data-rank={card.rank}
       data-sss-border={card.rank === "SSS" && framed ? card.border || "starry" : undefined}
       aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${fresh ? ", new" : ""}${priority ? ", priority" : ""}${copies > 1 ? `, ${copies} copies` : owned ? ", owned" : ""}${wanted > 0 ? `, wishlisted by ${wanted}` : ""}`}

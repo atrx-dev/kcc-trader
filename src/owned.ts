@@ -120,6 +120,8 @@ function legacySsCard(
     variantId: variant.id,
     variantName: variant.name || "SS artwork",
     border: null,
+    holo: null,
+    fullCard: false,
     image,
   };
 }

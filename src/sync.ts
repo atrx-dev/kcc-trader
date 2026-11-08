@@ -13,6 +13,7 @@ const LOCK_TTL_SECONDS = 120;
 const WRITE_GAP_MS = 1_100;
 const POOL = 6;
 const SYNC_EVERY_MS = 12 * 60 * 60 * 1000;
+const KCC_CHAN_ID = "c6b718f6-488a-4e40-b974-c021da730c70";
 
 export interface SyncEnv {
   CARDS: KVNamespace;
@@ -21,6 +22,8 @@ export interface SyncEnv {
 interface ArtRef {
   crop?: string;
   border?: string;
+  holo?: string;
+  fullCard?: boolean;
 }
 
 interface SssVariant {
@@ -84,6 +87,8 @@ function slim(card: DexCard, category: CardCategory): Card {
     variantId: card.variant?.id ?? null,
     variantName: card.variant?.name ?? null,
     border: rank === "SSS" ? (art?.border ?? card.character.sss?.border ?? "starry") : null,
+    holo: art?.holo ?? null,
+    fullCard: art?.fullCard === true,
     image: artUrl(art?.crop),
   };
 }
@@ -152,6 +157,8 @@ function sssCardsFor(character: DexCharacter): Card[] {
     variantId: variant.id,
     variantName: variant.name ?? null,
     border: variant.art?.border || "starry",
+    holo: variant.art?.holo ?? null,
+    fullCard: variant.art?.fullCard === true,
     image: artUrl(variant.art?.crop),
   }));
 }
@@ -177,6 +184,8 @@ function rankCardFor(character: DexCharacter, rank: "SS"): Card {
     variantId: null,
     variantName: null,
     border: null,
+    holo: art?.holo ?? null,
+    fullCard: art?.fullCard === true,
     image: artUrl(art?.crop),
   };
 }
@@ -184,6 +193,79 @@ function rankCardFor(character: DexCharacter, rank: "SS"): Card {
 function hiddenCardsFor(character: DexCharacter): Card[] {
   const base = character.isPromo ? [] : [rankCardFor(character, "SS")];
   return [...base, ...sssCardsFor(character)].map((card) => ({ ...card, hidden: true }));
+}
+
+function kccChanCards(character: DexCharacter): Card[] {
+  const art = character.sss ?? character.sssVariants?.[0]?.art ?? character.art;
+  const variant = character.sssVariants?.[0];
+  return [
+    {
+      id: character.id,
+      name: character.name,
+      game: character.game ?? "Koi Card Collector",
+      creator: character.creator ?? "Koi Card Collector",
+      rank: "SSS",
+      category: "events",
+      eventName: "KCC-chan",
+      variantId: variant?.id ?? character.id,
+      variantName: variant?.name && variant.name !== "Original secret" ? variant.name : null,
+      border: art?.border ?? "starry",
+      holo: art?.holo ?? "kcc-chan",
+      fullCard: art?.fullCard === true,
+      image: artUrl(art?.crop),
+    },
+  ];
+}
+
+async function fetchKccChanCharacter(): Promise<DexCharacter | null> {
+  try {
+    const response = await fetch(`${ORIGIN}/api/community/kcc-event`, {
+      headers: { "user-agent": "kcc-trader" },
+    });
+    if (response.ok) {
+      const data = (await response.json()) as { reward?: DexCharacter | null };
+      if (data.reward?.id) return data.reward;
+    }
+  } catch {
+    /* fall through to character lookup */
+  }
+  return fetchCharacterOrNull(KCC_CHAN_ID);
+}
+
+export async function ensureKccChanPromo(env: SyncEnv): Promise<boolean> {
+  const catalog = await readCatalog(env);
+  if (!catalog.syncedAt) return false;
+  const existing = catalog.cards.find((card) => card.id === KCC_CHAN_ID || card.holo === "kcc-chan");
+  if (existing?.holo === "kcc-chan" && existing.fullCard && existing.image) return false;
+
+  const character = await fetchKccChanCharacter();
+  if (!character) return false;
+  const cards = kccChanCards(character);
+  const byKey = new Map(catalog.cards.map((card) => [cardKey(card), card]));
+  let changed = false;
+  const at = new Date().toISOString();
+  for (const card of cards) {
+    const key = cardKey(card);
+    const previous = byKey.get(key);
+    if (!previous) {
+      byKey.set(key, { ...card, addedAt: at });
+      changed = true;
+      continue;
+    }
+    if (
+      previous.holo !== card.holo ||
+      previous.fullCard !== card.fullCard ||
+      previous.image !== card.image ||
+      previous.eventName !== card.eventName ||
+      previous.game !== card.game
+    ) {
+      byKey.set(key, { ...previous, ...card, addedAt: previous.addedAt });
+      changed = true;
+    }
+  }
+  if (!changed) return false;
+  await writeKey(env, "catalog", JSON.stringify({ ...catalog, cards: [...byKey.values()] }));
+  return true;
 }
 
 async function readHiddenIds(env: SyncEnv): Promise<string[]> {
@@ -375,7 +457,7 @@ function rememberAddedAt(previous: Card[], cards: Card[], at: string): Card[] {
   });
 }
 
-function finishRun(run: SyncRun, artwork: Card[]): Catalog {
+function finishRun(run: SyncRun, artwork: Card[], promos: Card[] = []): Catalog {
   const seenVariants = new Set(
     run.cards
       .filter((card) => card.rank === "SSS")
@@ -383,9 +465,13 @@ function finishRun(run: SyncRun, artwork: Card[]): Catalog {
       .filter((id): id is string => Boolean(id)),
   );
   const extraEvents = run.eventCards.filter((card) => !card.variantId || !seenVariants.has(card.variantId));
+  const seen = new Set(
+    [...run.cards, ...extraEvents, ...(run.hidden?.cards ?? []), ...artwork].map((card) => cardKey(card)),
+  );
+  const extraPromos = promos.filter((card) => !seen.has(cardKey(card)));
   return {
     syncedAt: new Date().toISOString(),
-    cards: [...run.cards, ...extraEvents, ...(run.hidden?.cards ?? []), ...artwork],
+    cards: [...run.cards, ...extraEvents, ...(run.hidden?.cards ?? []), ...artwork, ...extraPromos],
   };
 }
 
@@ -448,7 +534,9 @@ export async function stepCatalogSync(env: SyncEnv, force = false, owner = ""): 
   const seen = new Set([...run.cards, ...run.eventCards, ...(run.hidden?.cards ?? [])].map((card) => cardKey(card)));
   const artwork = (await readSsArtwork(env)).filter((card) => !seen.has(cardKey(card)));
   const previous = await readCatalog(env);
-  const catalog = finishRun(run, artwork);
+  const kccChan = await fetchKccChanCharacter().catch(() => null);
+  const promos = kccChan ? kccChanCards(kccChan) : [];
+  const catalog = finishRun(run, artwork, promos);
   if (previous.syncedAt && catalog.syncedAt) {
     catalog.cards = rememberAddedAt(previous.cards, catalog.cards, catalog.syncedAt);
   }
@@ -491,6 +579,8 @@ export async function readCatalog(env: SyncEnv): Promise<Catalog> {
       .map((card) => ({
         ...card,
         variantId: card.variantId ?? null,
+        holo: card.holo ?? null,
+        fullCard: card.fullCard === true,
         image: artUrl(card.image),
       })),
   };

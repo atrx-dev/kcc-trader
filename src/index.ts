@@ -22,7 +22,7 @@ import {
 import { isSpare, ownsCard, readOwned, SyncCooldownError, type OwnedResponse, type SyncedProfile } from "./owned.ts";
 import { profileEmbed, withProfileMeta } from "./embed.ts";
 import { isAdmin, profileSyncStatus, stepProfileSync } from "./admin.ts";
-import { addSsArtwork, catalogSyncStatus, discoverHiddenCards, readCatalog, stepCatalogSync } from "./sync.ts";
+import { addSsArtwork, catalogSyncStatus, discoverHiddenCards, ensureKccChanPromo, readCatalog, stepCatalogSync } from "./sync.ts";
 import { findTrades, wishlistDemand } from "./trades.ts";
 import { cardKey } from "./types.ts";
 
@@ -148,6 +148,7 @@ export default {
     if (crossSite(request, url)) return Response.json({ error: "Cross-site request blocked" }, { status: 403 });
 
     if (url.pathname === "/api/cards" && request.method === "GET") {
+      await ensureKccChanPromo(env).catch(() => false);
       return Response.json(await readCatalog(env));
     }
 
@@ -165,7 +166,10 @@ export default {
         const owned = await readOwned(env, user.profile.id, request.method === "POST", force);
         const artworkAdded = await addSsArtwork(env, owned.artwork);
         const characterIds = [...owned.ss, ...owned.sss].map((key) => key.split(":")[0]);
-        const catalogChanged = artworkAdded || (await discoverHiddenCards(env, characterIds).catch(() => false));
+        const catalogChanged =
+          artworkAdded ||
+          (await discoverHiddenCards(env, characterIds).catch(() => false)) ||
+          (await ensureKccChanPromo(env).catch(() => false));
         const listSync = await syncOwnedLists(env, user.id, owned);
         const refreshed = owned.profile ? withSyncedProfile(user, owned.profile) : user;
         await snapshotCollection(env, refreshed);

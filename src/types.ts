@@ -11,6 +11,8 @@ export interface Card {
   variantId: string | null;
   variantName: string | null;
   border: string | null;
+  holo: string | null;
+  fullCard: boolean;
   image: string;
   hidden?: boolean;
   addedAt?: string;
