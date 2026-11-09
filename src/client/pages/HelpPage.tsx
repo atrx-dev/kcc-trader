@@ -86,12 +86,21 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
           be skipped before it is a spare. If one was listed automatically, it comes off. Cards you add yourself stay
           listed for as long as you own them.
         </p>
+        <Figure
+          src="/help/skipped-cards.svg"
+          alt="Manage skipped cards is the sky button on the For trade page header."
+        />
         <p>A card you no longer own always leaves For trade, however it was added.</p>
         <p>
           <strong className="font-semibold text-white">Clear owned from Wishlist</strong> is on by default. A sync takes
           a card off your Wishlist once your collection includes it. Turn the setting off to keep owned cards on the
-          list until you remove them.
+          list until you remove them. Manage kept cards, on Wishlist, leaves chosen cards on the list even when that
+          setting is on. A card can be kept before you own it.
         </p>
+        <Figure
+          src="/help/kept-cards.svg"
+          alt="Manage kept cards is the rose button on the Wishlist page header."
+        />
       </Article>
 
       <Article id="trades" title="Finding a trade">

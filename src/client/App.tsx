@@ -584,12 +584,16 @@ export function App() {
   const ownedReady = owned.status === "ready";
   const skipKeys = useMemo(() => new Set(lists.skips ?? []), [lists.skips]);
   const skippableCards = useMemo(() => {
-    if (page !== "forTrade") return [];
+    if (page !== "forTrade" && page !== "wishlist") return [];
     return cards.filter((card) => card.rank === "SS" || card.rank === "SSS");
   }, [page, cards]);
   const skippedCards = useMemo(
     () => (page === "forTrade" ? cardsInCatalogOrder(lists.skips ?? [], byKey) : []),
     [page, lists.skips, byKey],
+  );
+  const keptCards = useMemo(
+    () => (page === "wishlist" ? cardsInCatalogOrder(lists.keeps ?? [], byKey) : []),
+    [page, lists.keeps, byKey],
   );
   const unlistedDuplicates = useMemo(() => {
     if (page !== "forTrade" || !ownedReady) return [];
@@ -612,6 +616,21 @@ export function App() {
       present: skip ? true : listNow,
       skip,
       ...(listNow ? { auto: true } : {}),
+    });
+  }
+  function setKeep(key: string, keep: boolean) {
+    const card = byKey.get(key);
+    const dropNow =
+      !keep &&
+      lists.pruneWishlist !== false &&
+      lists.wishlist.includes(key) &&
+      card !== undefined &&
+      isOwned(card, owned);
+    queueChange({
+      list: "wishlist",
+      key,
+      present: keep ? true : !dropNow,
+      keep,
     });
   }
   const needsPublicProfile = Boolean(
@@ -896,8 +915,11 @@ export function App() {
             unlistedDuplicates={unlistedDuplicates}
             listDuplicates={lists.listDuplicates === true}
             skippedCards={skippedCards}
+            keptCards={keptCards}
             candidates={skippableCards}
             onSkip={setSkip}
+            onKeep={setKeep}
+            pruneWishlist={lists.pruneWishlist !== false}
             owned={owned}
             ownedMarks={settings.ownedMarks}
             wanted={settings.wishlistMarks ? wantedBy : undefined}

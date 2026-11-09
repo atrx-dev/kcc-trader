@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Ban, Check, Copy, Info, LogIn, Plus, RotateCcw, SearchX, Star, X } from "lucide-react";
+import { Ban, Check, Copy, Info, LogIn, Pin, Plus, RotateCcw, SearchX, Star, X } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -19,6 +19,16 @@ function skipNotice(automatic: boolean, count: number): string {
   }
   const cards = count === 1 ? "1 card is" : `${count} cards are`;
   return `${cards} left out of duplicates listing.`;
+}
+
+function keepNotice(prune: boolean, count: number): string {
+  if (count === 0) {
+    return prune
+      ? "Clear owned from Wishlist is on."
+      : "Keep cards on your Wishlist after you own them.";
+  }
+  const cards = count === 1 ? "1 card stays" : `${count} cards stay`;
+  return `${cards} on your Wishlist when you own ${count === 1 ? "it" : "them"}.`;
 }
 
 export function ListPage({
@@ -43,8 +53,11 @@ export function ListPage({
   unlistedDuplicates,
   listDuplicates,
   skippedCards,
+  keptCards,
   candidates,
   onSkip,
+  onKeep,
+  pruneWishlist,
   owned,
   ownedMarks,
   wanted,
@@ -70,13 +83,17 @@ export function ListPage({
   unlistedDuplicates: Card[];
   listDuplicates: boolean;
   skippedCards: Card[];
+  keptCards: Card[];
   candidates: Card[];
   onSkip: (key: string, skip: boolean) => void;
+  onKeep: (key: string, keep: boolean) => void;
+  pruneWishlist: boolean;
   owned: OwnedState;
   ownedMarks: boolean;
   wanted?: ReadonlyMap<string, number>;
 }) {
   const [skipsOpen, setSkipsOpen] = useState(false);
+  const [keepsOpen, setKeepsOpen] = useState(false);
   const copy = LIST_COPY[list];
   const Icon = copy.icon;
   const searching = query.trim().length > 0;
@@ -130,6 +147,21 @@ export function ListPage({
               </Button>
             </TooltipTrigger>
             <TooltipContent>{skipNotice(listDuplicates, skippedCards.length)}</TooltipContent>
+          </Tooltip>
+        ) : null}
+        {user && list === "wishlist" ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                className="order-last w-full basis-full rounded-full bg-rose-300 text-rose-950 hover:bg-rose-200 md:order-none md:w-auto md:basis-auto"
+                onClick={() => setKeepsOpen(true)}
+              >
+                <Pin />
+                Manage kept cards
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{keepNotice(pruneWishlist, keptCards.length)}</TooltipContent>
           </Tooltip>
         ) : null}
         {user ? (
@@ -310,6 +342,15 @@ export function ListPage({
           onSkip={onSkip}
         />
       ) : null}
+      {list === "wishlist" ? (
+        <KeptDialog
+          open={keepsOpen}
+          kept={keptCards}
+          candidates={candidates}
+          onOpenChange={setKeepsOpen}
+          onKeep={onKeep}
+        />
+      ) : null}
     </>
   );
 }
@@ -414,6 +455,119 @@ function SkippedDialog({
                         onClick={() => onSkip(cardKey(card), false)}
                       >
                         Include
+                      </Button>
+                    }
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+function KeptDialog({
+  open,
+  kept,
+  candidates,
+  onOpenChange,
+  onKeep,
+}: {
+  open: boolean;
+  kept: Card[];
+  candidates: Card[];
+  onOpenChange: (open: boolean) => void;
+  onKeep: (key: string, keep: boolean) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const needle = query.trim().toLowerCase();
+  const keptKeys = new Set(kept.map(cardKey));
+  const matches = needle
+    ? candidates.filter((card) => searchableText(card).includes(needle)).slice(0, 40)
+    : [];
+
+  return (
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setQuery("");
+        onOpenChange(next);
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
+        <Dialog.Content className="fixed top-1/2 left-1/2 z-50 flex max-h-[min(36rem,calc(100dvh-2rem))] w-[min(28rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#1a1528] text-white shadow-lg outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+          <div className="px-6 pt-6 pr-14">
+            <Dialog.Title className="font-display text-xl font-bold">Manage kept cards</Dialog.Title>
+            <Dialog.Description className="mt-1 text-sm text-white/65">
+              Kept cards stay on your Wishlist after you own them, even when Clear owned from Wishlist is on. You can keep a card before you own it.
+            </Dialog.Description>
+          </div>
+          <Dialog.Close asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Close"
+              className="absolute top-3 right-3 rounded-full text-white/70 hover:bg-white/10 hover:text-white"
+            >
+              <X />
+            </Button>
+          </Dialog.Close>
+          <div className="px-6 pt-4">
+            <SearchField
+              id="keep-search"
+              label="Find a card to keep"
+              value={query}
+              placeholder="Find a card to keep"
+              onChange={setQuery}
+            />
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            {needle ? (
+              matches.length === 0 ? (
+                <p className="text-sm text-white/55">No cards match “{query.trim()}”.</p>
+              ) : (
+                <ul className="grid gap-2">
+                  {matches.map((card) => {
+                    const key = cardKey(card);
+                    const already = keptKeys.has(key);
+                    return (
+                      <SpareRow
+                        key={key}
+                        card={card}
+                        action={
+                          <Button
+                            size="sm"
+                            variant={already ? "secondary" : "outline"}
+                            className="shrink-0 rounded-full"
+                            onClick={() => onKeep(key, !already)}
+                          >
+                            {already ? "Don't keep" : "Keep"}
+                          </Button>
+                        }
+                      />
+                    );
+                  })}
+                </ul>
+              )
+            ) : kept.length === 0 ? (
+              <p className="text-sm text-white/55">Nothing is kept. Search for a card to leave it on your Wishlist when you own it.</p>
+            ) : (
+              <ul className="grid gap-2">
+                {kept.map((card) => (
+                  <SpareRow
+                    key={cardKey(card)}
+                    card={card}
+                    action={
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="shrink-0 rounded-full text-white/75"
+                        onClick={() => onKeep(cardKey(card), false)}
+                      >
+                        Don't keep
                       </Button>
                     }
                   />

@@ -88,6 +88,12 @@ export const FEATURES: FeatureNote[] = [
     body: "On Trades and on someone else's For trade, the gold chip shows how many copies they have — not only how many you have.",
     image: "/features/their-copies.svg",
   },
+  {
+    id: "kept-cards",
+    title: "Keep on Wishlist",
+    body: "On Wishlist, Manage kept cards leaves chosen cards on the list after you own them — even when Clear owned from Wishlist is on. You can keep one before you own it.",
+    image: "/features/kept-cards.svg",
+  },
 ];
 
 function newestFirst(notes: readonly FeatureNote[]): FeatureNote[] {

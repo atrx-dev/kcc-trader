@@ -29,6 +29,7 @@ export interface Lists {
   listDuplicates?: boolean;
   auto?: string[];
   skips?: string[];
+  keeps?: string[];
 }
 
 export interface ListSync {
@@ -49,6 +50,7 @@ export interface ListChange {
   auto?: boolean;
   priority?: boolean;
   skip?: boolean;
+  keep?: boolean;
 }
 
 export const NO_LISTS: Lists = { forTrade: [], wishlist: [], priority: [] };
@@ -60,8 +62,9 @@ export function withChanges(base: Lists, changes: ListChange[]): Lists {
     priority: base.priority ? [...base.priority] : [],
     auto: base.auto ? [...base.auto] : [],
     skips: base.skips ? [...base.skips] : [],
+    keeps: base.keeps ? [...base.keeps] : [],
   };
-  for (const { list, key, present, priority, auto, skip } of changes) {
+  for (const { list, key, present, priority, auto, skip, keep } of changes) {
     if (list === "forTrade" && skip !== undefined) {
       next.skips = skip
         ? next.skips!.includes(key)
@@ -74,6 +77,18 @@ export function withChanges(base: Lists, changes: ListChange[]): Lists {
       } else if (!skip && present && !next.forTrade.includes(key)) {
         next.forTrade = [key, ...next.forTrade];
         if (auto) next.auto = [key, ...next.auto!];
+      }
+      continue;
+    }
+    if (list === "wishlist" && keep !== undefined) {
+      next.keeps = keep
+        ? next.keeps!.includes(key)
+          ? next.keeps
+          : [key, ...next.keeps!]
+        : next.keeps!.filter((item) => item !== key);
+      if (!keep && !present) {
+        next.wishlist = next.wishlist.filter((item) => item !== key);
+        next.priority = next.priority!.filter((item) => item !== key);
       }
       continue;
     }
@@ -90,6 +105,7 @@ export function withChanges(base: Lists, changes: ListChange[]): Lists {
       }
     }
     if (list !== "wishlist") continue;
+    if (!present) next.keeps = next.keeps!.filter((item) => item !== key);
     if (!present || priority === false) next.priority = next.priority!.filter((item) => item !== key);
     else if (priority === true && !next.priority!.includes(key)) next.priority = [key, ...next.priority!];
   }

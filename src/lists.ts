@@ -6,6 +6,7 @@ export interface Lists {
   priority?: string[];
   auto?: string[];
   skips?: string[];
+  keeps?: string[];
 }
 
 export interface Trader {
@@ -25,6 +26,7 @@ export interface ListChange {
   auto?: boolean;
   priority?: boolean;
   skip?: boolean;
+  keep?: boolean;
 }
 
 export interface Preferences {
@@ -78,12 +80,13 @@ export function parseChanges(value: unknown): ListChange[] | null {
   const changes: ListChange[] = [];
   for (const item of value) {
     if (!item || typeof item !== "object") return null;
-    const { list, key, present, auto, priority, skip } = item as Record<string, unknown>;
+    const { list, key, present, auto, priority, skip, keep } = item as Record<string, unknown>;
     if (list !== "forTrade" && list !== "wishlist") return null;
     if (typeof key !== "string" || !KEY_PATTERN.test(key) || typeof present !== "boolean") return null;
     if (auto !== undefined && typeof auto !== "boolean") return null;
     if (priority !== undefined && (typeof priority !== "boolean" || list !== "wishlist")) return null;
     if (skip !== undefined && (typeof skip !== "boolean" || list !== "forTrade")) return null;
+    if (keep !== undefined && (typeof keep !== "boolean" || list !== "wishlist")) return null;
     changes.push({
       list,
       key,
@@ -91,6 +94,7 @@ export function parseChanges(value: unknown): ListChange[] | null {
       auto: auto === true,
       ...(typeof priority === "boolean" ? { priority } : {}),
       ...(typeof skip === "boolean" ? { skip } : {}),
+      ...(typeof keep === "boolean" ? { keep } : {}),
     });
   }
   return changes;
@@ -279,6 +283,10 @@ function selectSkips(env: ListEnv, id: string): D1PreparedStatement {
   return env.DB.prepare("SELECT card_key FROM trade_skips WHERE trader_id = ?").bind(id);
 }
 
+function selectKeeps(env: ListEnv, id: string): D1PreparedStatement {
+  return env.DB.prepare("SELECT card_key FROM wishlist_keeps WHERE trader_id = ?").bind(id);
+}
+
 function listsFrom(rows: EntryRow[]): Lists {
   const lists: Lists = { forTrade: [], wishlist: [], priority: [], auto: [] };
   for (const row of rows) {
@@ -289,11 +297,12 @@ function listsFrom(rows: EntryRow[]): Lists {
   return lists;
 }
 
-function responseFrom(trader: D1Result, entries: D1Result, skips: D1Result): ListsResponse {
+function responseFrom(trader: D1Result, entries: D1Result, skips: D1Result, keeps: D1Result): ListsResponse {
   const row = trader.results[0] as TraderRow | undefined;
   return {
     ...listsFrom(entries.results as unknown as EntryRow[]),
     skips: (skips.results as { card_key: string }[]).map((skip) => skip.card_key),
+    keeps: (keeps.results as { card_key: string }[]).map((keep) => keep.card_key),
     accepting: row?.accepting !== 0,
     pruneWishlist: row?.prune_wishlist !== 0,
     listDuplicates: row?.list_duplicates === 1,
@@ -301,14 +310,15 @@ function responseFrom(trader: D1Result, entries: D1Result, skips: D1Result): Lis
 }
 
 export async function readLists(env: ListEnv, trader: Trader): Promise<ListsResponse & { welcome: boolean }> {
-  const [, row, entries, skips] = await env.DB.batch([
+  const [, row, entries, skips, keeps] = await env.DB.batch([
     saveTrader(env, trader),
     selectTrader(env, trader.id),
     selectEntries(env, trader.id),
     selectSkips(env, trader.id),
+    selectKeeps(env, trader.id),
   ]);
   const stored = row.results[0] as TraderRow | undefined;
-  return { ...responseFrom(row, entries, skips), welcome: stored?.introduced === 0 };
+  return { ...responseFrom(row, entries, skips, keeps), welcome: stored?.introduced === 0 };
 }
 
 export function markIntroduced(env: ListEnv, traderId: string): Promise<D1Result> {
@@ -320,27 +330,34 @@ export async function setPreferences(
   trader: Trader,
   preferences: Partial<Preferences>,
 ): Promise<ListsResponse> {
-  const [, row, entries, skips] = await env.DB.batch([
+  const [, row, entries, skips, keeps] = await env.DB.batch([
     saveTrader(env, trader, preferences),
     selectTrader(env, trader.id),
     selectEntries(env, trader.id),
     selectSkips(env, trader.id),
+    selectKeeps(env, trader.id),
   ]);
-  return responseFrom(row, entries, skips);
+  return responseFrom(row, entries, skips, keeps);
 }
 
 export async function readPublicLists(
   env: ListEnv,
   userId: string,
 ): Promise<(Lists & { accepting: boolean; trader: Trader }) | null> {
-  const [row, entries, skips] = await env.DB.batch([
+  const [row, entries, skips, keeps] = await env.DB.batch([
     selectTrader(env, userId),
     selectEntries(env, userId),
     selectSkips(env, userId),
+    selectKeeps(env, userId),
   ]);
   const trader = row.results[0] as TraderRow | undefined;
   if (!trader) return null;
-  const { pruneWishlist: _, listDuplicates: __, auto: ___, skips: ____, ...lists } = responseFrom(row, entries, skips);
+  const { pruneWishlist: _, listDuplicates: __, auto: ___, skips: ____, keeps: _____, ...lists } = responseFrom(
+    row,
+    entries,
+    skips,
+    keeps,
+  );
   return { ...lists, trader: traderFromRow(trader) };
 }
 
@@ -351,10 +368,11 @@ export async function syncLists(
   duplicates: string[],
   newDuplicates: string[],
 ): Promise<ListSync> {
-  const [traderResult, entryResult, skipResult] = await env.DB.batch([
+  const [traderResult, entryResult, skipResult, keepResult] = await env.DB.batch([
     env.DB.prepare("SELECT prune_wishlist, list_duplicates FROM traders WHERE id = ?").bind(traderId),
     env.DB.prepare("SELECT list, card_key, auto FROM list_entries WHERE trader_id = ?").bind(traderId),
     env.DB.prepare("SELECT card_key FROM trade_skips WHERE trader_id = ?").bind(traderId),
+    env.DB.prepare("SELECT card_key FROM wishlist_keeps WHERE trader_id = ?").bind(traderId),
   ]);
   const trader = traderResult.results[0] as Pick<TraderRow, "prune_wishlist" | "list_duplicates"> | undefined;
   const sync: ListSync = { removed: { forTrade: [], wishlist: [] }, unlisted: [], added: [] };
@@ -362,10 +380,11 @@ export async function syncLists(
 
   const spare = new Set(duplicates);
   const skipped = new Set((skipResult.results as { card_key: string }[]).map((row) => row.card_key));
+  const kept = new Set((keepResult.results as { card_key: string }[]).map((row) => row.card_key));
   const listed = new Set<string>();
   for (const { list, card_key: key, auto } of entryResult.results as unknown as (EntryRow & { auto: number })[]) {
     if (list === "wishlist") {
-      if (trader.prune_wishlist !== 0 && owns(key)) sync.removed.wishlist.push(key);
+      if (trader.prune_wishlist !== 0 && owns(key) && !kept.has(key)) sync.removed.wishlist.push(key);
     } else if (!owns(key)) {
       sync.removed.forTrade.push(key);
     } else if (auto && (skipped.has(key) || (trader.list_duplicates && !spare.has(key)))) {
@@ -413,7 +432,7 @@ export async function changeLists(
   const writes: D1PreparedStatement[] = [saveTrader(env, trader)];
   let full = false;
 
-  changes.forEach(({ list, key, present, auto, priority, skip }, index) => {
+  changes.forEach(({ list, key, present, auto, priority, skip, keep }, index) => {
     if (list === "forTrade" && skip === true) {
       writes.push(
         env.DB.prepare("INSERT OR IGNORE INTO trade_skips (trader_id, card_key) VALUES (?, ?)").bind(trader.id, key),
@@ -434,9 +453,33 @@ export async function changeLists(
       writes.push(env.DB.prepare("DELETE FROM trade_skips WHERE trader_id = ? AND card_key = ?").bind(trader.id, key));
       return;
     }
+    if (list === "wishlist" && keep === true) {
+      writes.push(
+        env.DB.prepare("INSERT OR IGNORE INTO wishlist_keeps (trader_id, card_key) VALUES (?, ?)").bind(trader.id, key),
+      );
+      return;
+    }
+    if (list === "wishlist" && keep === false) {
+      writes.push(env.DB.prepare("DELETE FROM wishlist_keeps WHERE trader_id = ? AND card_key = ?").bind(trader.id, key));
+      if (!present) {
+        members.wishlist.delete(key);
+        writes.push(
+          env.DB.prepare("DELETE FROM list_entries WHERE trader_id = ? AND list = 'wishlist' AND card_key = ?").bind(
+            trader.id,
+            key,
+          ),
+        );
+      }
+      return;
+    }
     if (!present) {
       members[list].delete(key);
       if (list === "forTrade") autoKeys.delete(key);
+      if (list === "wishlist") {
+        writes.push(
+          env.DB.prepare("DELETE FROM wishlist_keeps WHERE trader_id = ? AND card_key = ?").bind(trader.id, key),
+        );
+      }
       writes.push(
         env.DB.prepare("DELETE FROM list_entries WHERE trader_id = ? AND list = ? AND card_key = ?").bind(
           trader.id,
@@ -483,9 +526,15 @@ export async function changeLists(
     selectTrader(env, trader.id),
     selectEntries(env, trader.id),
     selectSkips(env, trader.id),
+    selectKeeps(env, trader.id),
   ]);
   return {
-    ...responseFrom(results[results.length - 3], results[results.length - 2], results[results.length - 1]),
+    ...responseFrom(
+      results[results.length - 4],
+      results[results.length - 3],
+      results[results.length - 2],
+      results[results.length - 1],
+    ),
     full,
   };
 }

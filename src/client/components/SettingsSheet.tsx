@@ -127,8 +127,8 @@ export function SettingsSheet({
                     {pruneWishlist === null
                       ? "Sign in to have cards taken off your Wishlist once you own them."
                       : pruneWishlist
-                        ? "When your collection syncs, any card you now own is taken off your Wishlist."
-                        : "Cards you own stay on your Wishlist until you remove them yourself."}
+                        ? "When your collection syncs, any card you now own is taken off your Wishlist. Manage kept cards, on Wishlist, leaves chosen cards on the list even after you own them."
+                        : "Cards you own stay on your Wishlist until you remove them yourself. Manage kept cards, on Wishlist, still lets you mark cards to keep if you turn this back on."}
                   </p>
                 </div>
                 <Switch
