@@ -1,10 +1,11 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { CircleHelp, LogIn, LogOut, Search, Shield, Sparkles, Trophy } from "lucide-react";
+import { CircleHelp, LogIn, LogOut, Search, Shield, Trophy } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { PAGES, type Page, type SessionUser, type Trader } from "../model.ts";
+import { BrandLink } from "./brand.tsx";
 
 export function formatSyncedAt(value: string): string {
   const date = new Date(value);
@@ -13,24 +14,7 @@ export function formatSyncedAt(value: string): string {
 }
 
 export function Brand({ onOpen }: { onOpen: (page: Page, href: string) => void }) {
-  return (
-    <a
-      href="/"
-      aria-label="KCC Trader"
-      className="flex shrink-0 items-center gap-2.5"
-      onClick={(event) => {
-        event.preventDefault();
-        onOpen("catalog", "/");
-      }}
-    >
-      <span className="grid size-9 place-items-center rounded-xl bg-[linear-gradient(135deg,#fde7b0,#f3c46f_45%,#f59cc0)] text-[#2a1a08] shadow-[0_8px_24px_-10px_rgba(245,156,192,0.9)]">
-        <Sparkles className="size-[1.1rem]" strokeWidth={2.4} />
-      </span>
-      <span className="hidden font-display text-xl leading-none font-extrabold tracking-tight sm:inline">
-        KCC <span className="text-amber-200">Trader</span>
-      </span>
-    </a>
-  );
+  return <BrandLink onOpen={onOpen} className="flex" />;
 }
 
 export function NavTabs({

@@ -1,6 +1,6 @@
-import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Page } from "../model.ts";
+import { BrandLink } from "./brand.tsx";
 
 const LINKS: { page: Page; href: string; label: string }[] = [
   { page: "help", href: "/help", label: "Help" },
@@ -47,22 +47,7 @@ export function SiteFooter({
       <div className="relative mx-auto flex w-full max-w-[1400px] flex-col gap-8 px-4 pt-10 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:pb-12 md:px-8">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 max-w-xl">
-            <a
-              href="/"
-              aria-label="KCC Trader"
-              className="inline-flex items-center gap-2.5 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-              onClick={(event) => {
-                event.preventDefault();
-                onOpen("catalog", "/");
-              }}
-            >
-              <span className="grid size-11 place-items-center rounded-2xl bg-[linear-gradient(135deg,#fde7b0,#f3c46f_45%,#f59cc0)] text-[#2a1a08] shadow-[0_8px_24px_-10px_rgba(245,156,192,0.9)]">
-                <Sparkles className="size-5" strokeWidth={2.4} />
-              </span>
-              <span className="font-display text-2xl leading-none font-extrabold tracking-tight">
-                KCC <span className="text-amber-200">Trader</span>
-              </span>
-            </a>
+            <BrandLink onOpen={onOpen} size="lg" />
             <p className="mt-4 max-w-md font-display text-lg leading-snug font-semibold tracking-tight text-white/70">
               Find the trade. Keep the collection moving.
             </p>

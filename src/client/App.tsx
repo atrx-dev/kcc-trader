@@ -866,7 +866,7 @@ export function App() {
   return (
     <div className="flex min-h-svh flex-col">
       <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#151223]/95">
-        <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-4 md:px-8">
+        <div className="mx-auto flex h-[4.5rem] max-w-[1400px] items-center gap-4 px-4 md:px-8">
           <Brand onOpen={openPage} />
           <NavTabs page={page} counts={counts} attention={{ trades: tradeAttention }} onOpen={openPage} className="mx-auto hidden xl:flex" />
           <div className="ml-auto flex items-center gap-1 xl:ml-0">
