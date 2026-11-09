@@ -149,6 +149,9 @@ export function AdminPage() {
           if (!alive.current) break;
           continue;
         }
+        // Stay under KV's one-write-per-key-per-second limit on profile-sync.
+        await pause(1100);
+        if (!alive.current) break;
         force = false;
       }
     } catch (cause) {

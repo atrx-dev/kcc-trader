@@ -340,7 +340,12 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function writeKey(env: SyncEnv, key: string, value: string, options?: KVNamespacePutOptions): Promise<void> {
+export async function writeKey(
+  env: { CARDS: KVNamespace },
+  key: string,
+  value: string,
+  options?: KVNamespacePutOptions,
+): Promise<void> {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
       await (options ? env.CARDS.put(key, value, options) : env.CARDS.put(key, value));

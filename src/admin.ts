@@ -1,6 +1,6 @@
 import { recordCollection, syncLists, type CollectionStats } from "./lists.ts";
 import { isSpare, ownsCard, readOwned, type OwnedResponse, type SyncedProfile } from "./owned.ts";
-import { addSsArtwork, readCatalog, removeKey } from "./sync.ts";
+import { addSsArtwork, readCatalog, removeKey, writeKey } from "./sync.ts";
 import { cardKey } from "./types.ts";
 
 /** Discord ids allowed to open the admin panel. */
@@ -88,20 +88,20 @@ export async function stepProfileSync(env: AdminEnv, restart: boolean): Promise<
     return job ? progressOf(job, true) : { ...IDLE, locked: true };
   }
   const lockedAt = Date.now();
-  await env.CARDS.put(LOCK_KEY, String(lockedAt), { expirationTtl: 120 });
+  await writeKey(env, LOCK_KEY, String(lockedAt), { expirationTtl: 120 });
   try {
     let job = await env.CARDS.get<ProfileJob>(JOB_KEY, "json");
     if (restart || !job) job = await freshJob(env);
     else if (job.finishedAt) return progressOf(job, false);
     if (job.index >= job.traders.length) {
       job.finishedAt = job.finishedAt ?? new Date().toISOString();
-      await env.CARDS.put(JOB_KEY, JSON.stringify(job));
+      await writeKey(env, JOB_KEY, JSON.stringify(job));
       return progressOf(job, false);
     }
     const trader = job.traders[job.index];
     if (!trader) {
       job.finishedAt = new Date().toISOString();
-      await env.CARDS.put(JOB_KEY, JSON.stringify(job));
+      await writeKey(env, JOB_KEY, JSON.stringify(job));
       return progressOf(job, false);
     }
     try {
@@ -117,7 +117,7 @@ export async function stepProfileSync(env: AdminEnv, restart: boolean): Promise<
     job.last = trader.name;
     job.index += 1;
     if (job.index >= job.traders.length) job.finishedAt = new Date().toISOString();
-    await env.CARDS.put(JOB_KEY, JSON.stringify(job));
+    await writeKey(env, JOB_KEY, JSON.stringify(job));
     return progressOf(job, false);
   } finally {
     // KV allows one write per key per second; fast traders need a gap before delete.

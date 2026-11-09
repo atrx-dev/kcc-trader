@@ -1,4 +1,4 @@
-import { artUrl, removeKey } from "./sync.ts";
+import { artUrl, removeKey, writeKey } from "./sync.ts";
 import { type Card } from "./types.ts";
 
 const ORIGIN = "https://koi-card-collector.com";
@@ -366,7 +366,7 @@ export async function readOwned(env: OwnedEnv, profileId: string, refresh: boole
   const syncProgress = pass.syncProgress;
 
   if (!pass.owned.complete) {
-    await env.CARDS.put(syncKey, JSON.stringify(pass.state));
+    await writeKey(env, syncKey, JSON.stringify(pass.state));
     const placeholder = cached && Array.isArray(cached.ss) ? withNextSync(cached) : withNextSync(pass.owned);
     return {
       ...placeholder,
@@ -379,7 +379,7 @@ export async function readOwned(env: OwnedEnv, profileId: string, refresh: boole
   }
 
   await removeKey(env, syncKey);
-  await env.CARDS.put(cacheKey, JSON.stringify(pass.owned));
+  await writeKey(env, cacheKey, JSON.stringify(pass.owned));
   return {
     ...withNextSync(pass.owned),
     previousDuplicates: pass.state.previousDuplicates,
