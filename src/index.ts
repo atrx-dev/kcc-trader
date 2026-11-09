@@ -173,6 +173,10 @@ export default {
       try {
         const force = request.method === "POST" && url.searchParams.get("force") === "1";
         const owned = await readOwned(env, user.profile.id, request.method === "POST", force);
+        if (!owned.complete) {
+          const { previousDuplicates: _, artwork: __, profile: ___, ...cards } = owned;
+          return Response.json({ ...cards, syncProgress: owned.syncProgress, catalogChanged: false, listSync: null });
+        }
         const artworkAdded = await addSsArtwork(env, owned.artwork);
         const characterIds = [...owned.ss, ...owned.sss].map((key) => key.split(":")[0]);
         const catalogChanged =
@@ -194,7 +198,13 @@ export default {
           await rememberTrader(env, traderFor(refreshed));
         }
         const { previousDuplicates: _, artwork: __, profile: ___, ...cards } = owned;
-        const body = { ...cards, catalogChanged, listSync, ...(changed ? { user: refreshed } : {}) };
+        const body = {
+          ...cards,
+          syncProgress: owned.syncProgress,
+          catalogChanged,
+          listSync,
+          ...(changed ? { user: refreshed } : {}),
+        };
         if (!changed) return Response.json(body);
         const cookie = await sessionCookie(request, env, refreshed);
         return Response.json(body, cookie ? { headers: { "Set-Cookie": cookie } } : undefined);

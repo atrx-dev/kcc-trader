@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { RotateCcw, SearchX } from "lucide-react";
+import { AlertCircle, Check, RefreshCw, RotateCcw, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { cardKey, type Card, type Catalog } from "../types.ts";
 import { VirtualGrid } from "./VirtualGrid.tsx";
-import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, byName, newestFirst, mostDesired, type CatalogSort, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, catalogSortFromSearch, urlSearchFor, urlHasFilters, tradeViewFromPath, tradeViewHref, type TradeView, leaderboardByFromPath, leaderboardHref, type LeaderboardBy, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters, seenTradesKey, tradeSignature, readSeenTrades } from "./model.ts";
+import { type SessionUser, type Lists, type ListSync, type ListName, type Page, type ListChange, NO_LISTS, LIST_SAVE_DELAY, withChanges, type TradeMatch, type TradesState, type OwnedState, type Filters, NO_FILTERS, NO_PAGE_FILTERS, type Settings, SETTINGS_KEY, loadSettings, withoutRarities, NO_OWNED, SyncCooldownError, requestOwned, formatTime, VISIT_SYNC_MS, isOwned, isDuplicate, duplicateCount, cardsInCatalogOrder, priorityFirst, byName, newestFirst, mostDesired, type CatalogSort, RANK_ORDER, AUTH_ERRORS, ACTIONS_HEIGHT, pageFromPath, profileIdFromPath, readUrlState, catalogSortFromSearch, urlSearchFor, urlHasFilters, tradeViewFromPath, tradeViewHref, type TradeView, leaderboardByFromPath, leaderboardHref, type LeaderboardBy, searchableText, orderedValues, facetOptionsFor, filtersAreActive, applyFilters, seenTradesKey, tradeSignature, readSeenTrades, type SyncProgress } from "./model.ts";
+
 import { CardFace } from "./components/cards.tsx";
 import { formatSyncedAt, AdminButton, Brand, NavTabs, AccountMenu, HelpButton, LeaderboardButton, TraderSearch } from "./components/header.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
@@ -69,7 +71,35 @@ export function App() {
   }, [settings.cardEffects]);
   const [owned, setOwned] = useState<OwnedState>(NO_OWNED);
   const [ownedSyncFailed, setOwnedSyncFailed] = useState(false);
+  const [syncFlash, setSyncFlash] = useState<{ kind: "done"; progress: SyncProgress } | { kind: "error" } | null>(
+    null,
+  );
+  const syncFlashTimer = useRef<number | null>(null);
   const [, setSyncTick] = useState(0);
+
+  function clearSyncFlash() {
+    if (syncFlashTimer.current !== null) {
+      window.clearTimeout(syncFlashTimer.current);
+      syncFlashTimer.current = null;
+    }
+    setSyncFlash(null);
+  }
+
+  function showSyncFlash(flash: { kind: "done"; progress: SyncProgress } | { kind: "error" }, ms: number) {
+    clearSyncFlash();
+    setSyncFlash(flash);
+    syncFlashTimer.current = window.setTimeout(() => {
+      setSyncFlash(null);
+      syncFlashTimer.current = null;
+    }, ms);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (syncFlashTimer.current !== null) window.clearTimeout(syncFlashTimer.current);
+    };
+  }, []);
+
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [trades, setTrades] = useState<TradesState>({ status: "idle", matches: [], demand: {} });
   const [tradesVersion, setTradesVersion] = useState(0);
@@ -212,11 +242,15 @@ export function App() {
     setOwned({ ...NO_OWNED, status: "loading" });
     const controller = new AbortController();
     requestOwned("GET", controller.signal)
-      .then(({ state, catalogChanged, listSync }) => {
+      .then(({ state, catalogChanged, listSync, complete }) => {
         if (controller.signal.aborted) return;
         setOwned(state);
         if (catalogChanged) setCatalogVersion((version) => version + 1);
         applyListSync(listSync);
+        if (!complete) {
+          void syncOwned();
+          return;
+        }
         const fetched = state.fetchedAt ? Date.parse(state.fetchedAt) : NaN;
         if (!Number.isFinite(fetched) || Date.now() - fetched >= VISIT_SYNC_MS) void syncOwned();
       })
@@ -251,20 +285,38 @@ export function App() {
 
   async function syncOwned(force = false) {
     setOwnedSyncFailed(false);
-    setOwned((current) => ({ ...current, syncing: true }));
+    clearSyncFlash();
+    setOwned((current) => ({ ...current, syncing: true, syncProgress: null }));
     try {
-      const { state, catalogChanged, listSync, user: refreshed } = await requestOwned("POST", undefined, force);
-      setOwned(state);
-      if (refreshed) setUser(refreshed);
-      if (catalogChanged) setCatalogVersion((version) => version + 1);
-      applyListSync(listSync);
+      let useForce = force;
+      let lastProgress: SyncProgress | null = null;
+      for (;;) {
+        const { state, catalogChanged, listSync, user: refreshed, complete, syncProgress } = await requestOwned(
+          "POST",
+          undefined,
+          useForce,
+        );
+        useForce = false;
+        if (syncProgress) lastProgress = syncProgress;
+        if (!complete) {
+          setOwned((current) => ({ ...current, syncing: true, syncProgress }));
+          continue;
+        }
+        setOwned({ ...state, syncing: false, syncProgress: null });
+        if (refreshed) setUser(refreshed);
+        if (catalogChanged) setCatalogVersion((version) => version + 1);
+        applyListSync(listSync);
+        showSyncFlash({ kind: "done", progress: lastProgress ?? { cards: 0, total: 0 } }, 1400);
+        break;
+      }
     } catch (cause) {
       if (cause instanceof SyncCooldownError) {
-        setOwned((current) => ({ ...current, nextSyncAt: cause.nextSyncAt, syncing: false }));
+        setOwned((current) => ({ ...current, nextSyncAt: cause.nextSyncAt, syncing: false, syncProgress: null }));
         return;
       }
-      setOwned((current) => ({ ...current, syncing: false }));
+      setOwned((current) => ({ ...current, syncing: false, syncProgress: null }));
       setOwnedSyncFailed(true);
+      showSyncFlash({ kind: "error" }, 2400);
     }
   }
 
@@ -681,6 +733,15 @@ export function App() {
         ]
           .filter(Boolean)
           .join(" ");
+  const syncProgressUi = owned.syncProgress ?? (syncFlash?.kind === "done" ? syncFlash.progress : null);
+  const syncFinished = syncFlash?.kind === "done" && !owned.syncing;
+  const syncFailed = syncFlash?.kind === "error" && !owned.syncing;
+  const syncIndicatorOpen = owned.syncing || syncFlash !== null;
+  const syncPercent =
+    syncProgressUi && syncProgressUi.total > 0
+      ? Math.min(100, Math.round((syncProgressUi.cards / Math.max(syncProgressUi.total, 1)) * 100))
+      : null;
+  const syncRing = 2 * Math.PI * 9;
   const ownedControls: OwnedControls | null = user?.profile
     ? {
         ready: owned.status === "ready",
@@ -794,6 +855,75 @@ export function App() {
           className="rounded-none border-0 bg-transparent p-0"
         />
       </div>
+
+      {syncIndicatorOpen ? (
+        <div
+          className="pointer-events-none fixed right-4 z-50 w-[min(16.5rem,calc(100%-2rem))] max-sm:bottom-[calc(4.25rem+env(safe-area-inset-bottom))] sm:bottom-4"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="rounded-xl bg-[#151223]/95 px-3 py-2.5 ring-1 ring-white/10">
+            <div className="flex items-center gap-2.5">
+              <span
+                className="relative grid size-8 shrink-0 place-items-center"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={syncFailed || syncFinished ? 100 : (syncPercent ?? undefined)}
+              >
+                <svg viewBox="0 0 24 24" className="absolute inset-0 size-8 -rotate-90" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/10" />
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="9"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeDasharray={syncRing}
+                    strokeDashoffset={
+                      syncFailed || syncFinished
+                        ? 0
+                        : syncPercent !== null
+                          ? syncRing * (1 - syncPercent / 100)
+                          : syncRing * 0.75
+                    }
+                    className={cn(
+                      "transition-[stroke-dashoffset] duration-300 ease-out",
+                      syncFailed ? "text-rose-300" : syncFinished ? "text-emerald-300" : "text-[#f3d58f]",
+                      !syncFailed && !syncFinished && syncPercent === null && "animate-pulse",
+                    )}
+                  />
+                </svg>
+                {syncFailed ? (
+                  <AlertCircle className="size-3.5 text-rose-300" aria-hidden="true" />
+                ) : syncFinished ? (
+                  <Check className="size-3.5 text-emerald-300" aria-hidden="true" />
+                ) : (
+                  <RefreshCw className="size-3 animate-spin text-[#f3d58f]" aria-hidden="true" />
+                )}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-white/90">
+                  {syncFailed ? "Sync failed" : syncFinished ? "Collection synced" : "Syncing collection"}
+                </p>
+                <p className="truncate text-[11px] tabular-nums text-white/50">
+                  {syncFailed
+                    ? "Try again in a moment"
+                    : syncFinished
+                      ? syncProgressUi && syncProgressUi.total > 0
+                        ? `${syncProgressUi.total.toLocaleString()} cards`
+                        : "Up to date"
+                      : syncProgressUi
+                        ? `${syncProgressUi.cards.toLocaleString()} of ${syncProgressUi.total.toLocaleString()} cards`
+                        : "Fetching from KCC…"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <main className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-1 flex-col gap-6 px-4 py-6 md:px-8 md:py-10">
         {authError ? <Banner>{authError}</Banner> : null}

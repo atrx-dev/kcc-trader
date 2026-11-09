@@ -2,9 +2,15 @@ import { artUrl } from "./sync.ts";
 import { type Card } from "./types.ts";
 
 const ORIGIN = "https://koi-card-collector.com";
-const MAX_PAGES = 40;
+const PAGES_PER_PASS = 45;
 const POOL = 6;
 const SYNC_COOLDOWN_MS = 60 * 60 * 1000;
+const PROGRESS_TTL_MS = 60 * 60 * 1000;
+
+export interface SyncProgress {
+  cards: number;
+  total: number;
+}
 
 export interface OwnedCards {
   ss: string[];
@@ -33,9 +39,25 @@ export type OwnedResponse = OwnedCards & {
   previousDuplicates?: Record<string, number>;
   artwork: Card[];
   profile: SyncedProfile | null;
+  syncProgress?: SyncProgress;
 };
 
 type CachedOwned = OwnedCards & { nextSyncAt: string };
+
+interface OwnedSyncState {
+  nextPage: number;
+  pageCount: number;
+  perPage: number;
+  total: number;
+  hidden: boolean;
+  ss: Record<string, number>;
+  sss: Record<string, number>;
+  artwork: Card[];
+  copies: number;
+  profile: SyncedProfile | null;
+  previousDuplicates: Record<string, number>;
+  startedAt: string;
+}
 
 export class SyncCooldownError extends Error {
   constructor(readonly nextSyncAt: string) {
@@ -82,6 +104,10 @@ interface CollectionPage {
 
 interface OwnedEnv {
   CARDS: KVNamespace;
+}
+
+function progressKey(profileId: string) {
+  return `owned-sync:${profileId}`;
 }
 
 async function fetchPage(profileId: string, page: number): Promise<CollectionPage> {
@@ -145,27 +171,16 @@ function profileFrom(page: CollectionPage): SyncedProfile | null {
   };
 }
 
-async function fetchOwned(profileId: string): Promise<{ owned: OwnedCards; artwork: Card[]; profile: SyncedProfile | null }> {
-  const first = await fetchPage(profileId, 0);
-  const perPage = first.cards?.length ?? 0;
-  const total = first.total ?? perPage;
-  const pageCount = perPage > 0 ? Math.ceil(total / perPage) : 1;
-  const lastPage = Math.min(pageCount, MAX_PAGES);
-  const pages = [first];
-  let next = 1;
-  let done = Boolean(first.hidden) || pageCount <= 1 || reachesUntracked(first);
+function artworkKey(card: Card): string {
+  return card.variantId ? `${card.id}:${card.variantId}` : card.id;
+}
 
-  while (!done && next < lastPage) {
-    const batch = Array.from({ length: Math.min(POOL, lastPage - next) }, (_, index) => next + index);
-    const results = await Promise.all(batch.map((page) => fetchPage(profileId, page)));
-    pages.push(...results);
-    next += batch.length;
-    done = next >= pageCount || results.some(reachesUntracked);
-  }
-
-  const ss = new Map<string, number>();
-  const sss = new Map<string, number>();
-  const artwork = new Map<string, Card>();
+function absorbPages(
+  pages: CollectionPage[],
+  ss: Map<string, number>,
+  sss: Map<string, number>,
+  artwork: Map<string, Card>,
+): number {
   let copies = 0;
   for (const page of pages) {
     for (const entry of page.cards ?? []) {
@@ -188,19 +203,102 @@ async function fetchOwned(profileId: string): Promise<{ owned: OwnedCards; artwo
       if (card) artwork.set(key, card);
     }
   }
+  return copies;
+}
+
+async function fetchOwnedPass(
+  profileId: string,
+  prior: OwnedSyncState | null,
+  previousDuplicates: Record<string, number>,
+): Promise<{
+  owned: OwnedCards;
+  artwork: Card[];
+  profile: SyncedProfile | null;
+  state: OwnedSyncState;
+  syncProgress: SyncProgress;
+}> {
+  const ss = new Map<string, number>(prior ? Object.entries(prior.ss) : []);
+  const sss = new Map<string, number>(prior ? Object.entries(prior.sss) : []);
+  const artwork = new Map<string, Card>(prior ? prior.artwork.map((card) => [artworkKey(card), card]) : []);
+  let copies = prior?.copies ?? 0;
+  let next = prior?.nextPage ?? 0;
+  let pageCount = prior?.pageCount ?? 1;
+  let perPage = prior?.perPage ?? 0;
+  let total = prior?.total ?? 0;
+  let hidden = prior?.hidden ?? false;
+  let profile = prior?.profile ?? null;
+  const startedAt = prior?.startedAt ?? new Date().toISOString();
+  const prevDup = prior?.previousDuplicates ?? previousDuplicates;
+
+  if (prior && (!perPage || !total) && pageCount > 0) {
+    perPage = perPage || 20;
+    total = total || pageCount * perPage;
+  }
+
+  const pages: CollectionPage[] = [];
+  let fetched = 0;
+  let done = false;
+
+  if (!prior) {
+    const first = await fetchPage(profileId, 0);
+    pages.push(first);
+    fetched = 1;
+    perPage = first.cards?.length ?? 0;
+    total = first.total ?? perPage;
+    pageCount = perPage > 0 ? Math.ceil(total / perPage) : 1;
+    hidden = Boolean(first.hidden);
+    profile = profileFrom(first);
+    next = 1;
+    done = hidden || pageCount <= 1 || reachesUntracked(first);
+  }
+
+  while (!done && fetched < PAGES_PER_PASS && next < pageCount) {
+    const room = Math.min(POOL, PAGES_PER_PASS - fetched, pageCount - next);
+    if (room <= 0) break;
+    const batch = Array.from({ length: room }, (_, index) => next + index);
+    const results = await Promise.all(batch.map((page) => fetchPage(profileId, page)));
+    pages.push(...results);
+    fetched += batch.length;
+    next += batch.length;
+    done = next >= pageCount || results.some(reachesUntracked);
+  }
+
+  copies += absorbPages(pages, ss, sss, artwork);
+
+  const state: OwnedSyncState = {
+    nextPage: next,
+    pageCount,
+    perPage,
+    total,
+    hidden,
+    ss: Object.fromEntries(ss),
+    sss: Object.fromEntries(sss),
+    artwork: [...artwork.values()],
+    copies,
+    profile,
+    previousDuplicates: prevDup,
+    startedAt,
+  };
+
+  const owned: OwnedCards = {
+    ss: [...ss.keys()],
+    sss: [...sss.keys()],
+    duplicates: Object.fromEntries([...ss, ...sss].filter(([, count]) => count > 1)),
+    copies,
+    hidden,
+    complete: done,
+    fetchedAt: new Date().toISOString(),
+  };
 
   return {
-    profile: profileFrom(first),
-    owned: {
-      ss: [...ss.keys()],
-      sss: [...sss.keys()],
-      duplicates: Object.fromEntries([...ss, ...sss].filter(([, count]) => count > 1)),
-      copies,
-      hidden: Boolean(first.hidden),
-      complete: done,
-      fetchedAt: new Date().toISOString(),
-    },
+    owned,
     artwork: [...artwork.values()],
+    profile,
+    state,
+    syncProgress: {
+      cards: Math.min(next * Math.max(perPage, 1), Math.max(total, 0)),
+      total: Math.max(total, 0),
+    },
   };
 }
 
@@ -241,15 +339,49 @@ export async function readCachedDuplicates(env: OwnedEnv, profileId: string): Pr
   return cached.duplicates ?? {};
 }
 
+function freshProgress(progress: OwnedSyncState | null): OwnedSyncState | null {
+  if (!progress) return null;
+  if (Date.now() - Date.parse(progress.startedAt) > PROGRESS_TTL_MS) return null;
+  return progress;
+}
+
 export async function readOwned(env: OwnedEnv, profileId: string, refresh: boolean, force = false): Promise<OwnedResponse> {
   const cacheKey = `owned:${profileId}`;
+  const syncKey = progressKey(profileId);
   const cached = await env.CARDS.get<OwnedCards>(cacheKey, "json");
-  if (cached && Array.isArray(cached.ss)) {
+  if (!refresh && cached && Array.isArray(cached.ss)) {
+    return { ...withNextSync(cached), artwork: [], profile: null };
+  }
+
+  const prior = freshProgress(await env.CARDS.get<OwnedSyncState>(syncKey, "json"));
+  if (!prior && cached && Array.isArray(cached.ss)) {
     const response = withNextSync(cached);
-    if (!refresh) return { ...response, artwork: [], profile: null };
     if (!force && Date.parse(response.nextSyncAt) > Date.now()) throw new SyncCooldownError(response.nextSyncAt);
   }
-  const { owned, artwork, profile } = await fetchOwned(profileId);
-  await env.CARDS.put(cacheKey, JSON.stringify(owned));
-  return { ...withNextSync(owned), previousDuplicates: cached?.duplicates ?? {}, artwork, profile };
+
+  const pass = await fetchOwnedPass(profileId, prior, cached?.duplicates ?? {});
+  const syncProgress = pass.syncProgress;
+
+  if (!pass.owned.complete) {
+    await env.CARDS.put(syncKey, JSON.stringify(pass.state));
+    const placeholder = cached && Array.isArray(cached.ss) ? withNextSync(cached) : withNextSync(pass.owned);
+    return {
+      ...placeholder,
+      complete: false,
+      syncProgress,
+      artwork: [],
+      profile: pass.profile,
+      previousDuplicates: pass.state.previousDuplicates,
+    };
+  }
+
+  await env.CARDS.delete(syncKey);
+  await env.CARDS.put(cacheKey, JSON.stringify(pass.owned));
+  return {
+    ...withNextSync(pass.owned),
+    previousDuplicates: pass.state.previousDuplicates,
+    artwork: pass.artwork,
+    profile: pass.profile,
+    syncProgress,
+  };
 }

@@ -176,13 +176,20 @@ export function readSeenTrades(userId: string): Set<string> {
   }
 }
 
+export interface SyncProgress {
+  cards: number;
+  total: number;
+}
+
 export interface OwnedCards {
   ss: string[];
   sss: string[];
   duplicates?: Record<string, number>;
   hidden: boolean;
+  complete?: boolean;
   fetchedAt: string;
   nextSyncAt: string;
+  syncProgress?: SyncProgress;
 }
 
 export interface OwnedState {
@@ -193,6 +200,7 @@ export interface OwnedState {
   fetchedAt: string | null;
   nextSyncAt: string | null;
   syncing: boolean;
+  syncProgress: SyncProgress | null;
 }
 
 export type FacetId = "rarity" | "type" | "game" | "developer";
@@ -313,6 +321,7 @@ export const NO_OWNED: OwnedState = {
   fetchedAt: null,
   nextSyncAt: null,
   syncing: false,
+  syncProgress: null,
 };
 
 export class SyncCooldownError extends Error {
@@ -330,6 +339,7 @@ export function ownedFromResponse(data: OwnedCards): OwnedState {
     fetchedAt: data.fetchedAt,
     nextSyncAt: data.nextSyncAt,
     syncing: false,
+    syncProgress: data.syncProgress ?? null,
   };
 }
 
@@ -337,7 +347,14 @@ export async function requestOwned(
   method: "GET" | "POST",
   signal?: AbortSignal,
   force = false,
-): Promise<{ state: OwnedState; catalogChanged: boolean; listSync: ListSync | null; user: SessionUser | null }> {
+): Promise<{
+  state: OwnedState;
+  catalogChanged: boolean;
+  listSync: ListSync | null;
+  user: SessionUser | null;
+  complete: boolean;
+  syncProgress: SyncProgress | null;
+}> {
   const response = await fetch(force ? "/api/owned?force=1" : "/api/owned", { method, signal });
   if (response.status === 429) {
     const body = (await response.json().catch(() => null)) as { nextSyncAt?: string } | null;
@@ -349,11 +366,14 @@ export async function requestOwned(
     listSync?: ListSync | null;
     user?: SessionUser;
   };
+  const complete = data.complete !== false;
   return {
     state: ownedFromResponse(data),
     catalogChanged: Boolean(data.catalogChanged),
     listSync: data.listSync ?? null,
     user: data.user ?? null,
+    complete,
+    syncProgress: data.syncProgress ?? null,
   };
 }
 
