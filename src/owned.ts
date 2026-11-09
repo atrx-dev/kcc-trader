@@ -3,7 +3,8 @@ import { type Card } from "./types.ts";
 
 const ORIGIN = "https://koi-card-collector.com";
 const PAGES_PER_PASS = 45;
-const POOL = 6;
+const POOL = 1;
+const PAGE_SIZE = 1000;
 const SYNC_COOLDOWN_MS = 60 * 60 * 1000;
 const PROGRESS_TTL_MS = 60 * 60 * 1000;
 
@@ -78,6 +79,7 @@ interface CollectionVariant {
 
 interface CollectionPage {
   total?: number;
+  pageSize?: number;
   hidden?: boolean;
   profile?: {
     id?: string;
@@ -115,6 +117,7 @@ async function fetchPage(profileId: string, page: number): Promise<CollectionPag
   url.searchParams.set("section", "collection");
   url.searchParams.set("sort", "rarity");
   url.searchParams.set("page", String(page));
+  url.searchParams.set("pageSize", String(PAGE_SIZE));
   const response = await fetch(url, { headers: { "user-agent": "kcc-trader" } });
   if (!response.ok) throw new Error(`Collection page ${page} failed: ${response.status}`);
   return (await response.json()) as CollectionPage;
@@ -231,7 +234,7 @@ async function fetchOwnedPass(
   const prevDup = prior?.previousDuplicates ?? previousDuplicates;
 
   if (prior && (!perPage || !total) && pageCount > 0) {
-    perPage = perPage || 20;
+    perPage = perPage || PAGE_SIZE;
     total = total || pageCount * perPage;
   }
 
@@ -243,7 +246,7 @@ async function fetchOwnedPass(
     const first = await fetchPage(profileId, 0);
     pages.push(first);
     fetched = 1;
-    perPage = first.cards?.length ?? 0;
+    perPage = first.pageSize ?? first.cards?.length ?? PAGE_SIZE;
     total = first.total ?? perPage;
     pageCount = perPage > 0 ? Math.ceil(total / perPage) : 1;
     hidden = Boolean(first.hidden);
