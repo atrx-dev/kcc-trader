@@ -6,6 +6,8 @@ import {
   readLists,
   readPublicLists,
   countTraders,
+  deleteTraders,
+  listStalePrivateTraders,
   readLeaderboard,
   recordCollection,
   rememberTrader,
@@ -31,9 +33,11 @@ import {
 } from "./owned.ts";
 import { profileEmbed, withProfileMeta } from "./embed.ts";
 import { isAdmin, profileSyncStatus, stepProfileSync } from "./admin.ts";
-import { addSsArtwork, catalogSyncStatus, discoverHiddenCards, ensureKccChanPromo, readCatalog, stepCatalogSync } from "./sync.ts";
+import { addSsArtwork, catalogSyncStatus, discoverHiddenCards, ensureKccChanPromo, readCatalog, removeKey, stepCatalogSync } from "./sync.ts";
 import { findTrades, wishlistDemand } from "./trades.ts";
 import { cardKey } from "./types.ts";
+
+const PURGE_CRON = "15 4 * * *";
 
 function sameUser(left: SessionUser, right: SessionUser): boolean {
   const profile = left.profile;
@@ -390,7 +394,26 @@ export default {
     return new Response(null, { status: 404 });
   },
 
-  async scheduled(_controller, env, ctx) {
+  async scheduled(controller, env, ctx) {
+    if (controller.cron === PURGE_CRON) {
+      ctx.waitUntil(purgeStalePrivateTraders(env));
+      return;
+    }
     ctx.waitUntil(stepCatalogSync(env));
   },
 } satisfies ExportedHandler<Env>;
+
+async function purgeStalePrivateTraders(env: Env): Promise<void> {
+  const stale = (await listStalePrivateTraders(env)).filter((trader) => !isAdmin({ id: trader.id }));
+  if (stale.length === 0) return;
+  await deleteTraders(
+    env,
+    stale.map((trader) => trader.id),
+  );
+  await Promise.all(
+    stale.flatMap((trader) => {
+      const profileId = trader.kccId || trader.id;
+      return [removeKey(env, `owned:${profileId}`), removeKey(env, `owned-sync:${profileId}`)];
+    }),
+  );
+}

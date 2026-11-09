@@ -103,8 +103,31 @@ export function parseChanges(value: unknown): ListChange[] | null {
 const TRADER_SEARCH_LIMIT = 8;
 
 export async function countTraders(env: ListEnv): Promise<number> {
-  const row = await env.DB.prepare("SELECT COUNT(*) AS total FROM traders").first<{ total: number }>();
+  const row = await env.DB.prepare(
+    "SELECT COUNT(*) AS total FROM traders WHERE sss IS NOT NULL",
+  ).first<{ total: number }>();
   return Number(row?.total ?? 0);
+}
+
+/** Traders with no public collection who have not been seen for this long. */
+export const STALE_PRIVATE_MS = 30 * 24 * 60 * 60 * 1000;
+
+export async function listStalePrivateTraders(
+  env: ListEnv,
+  olderThanMs = STALE_PRIVATE_MS,
+): Promise<{ id: string; kccId: string | null }[]> {
+  const rows = await env.DB.prepare(
+    "SELECT id, kcc_id FROM traders WHERE sss IS NULL AND last_seen_at < ? ORDER BY last_seen_at",
+  )
+    .bind(Date.now() - olderThanMs)
+    .all<{ id: string; kcc_id: string | null }>();
+  return rows.results.map((row) => ({ id: row.id, kccId: row.kcc_id }));
+}
+
+export async function deleteTraders(env: ListEnv, ids: readonly string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const result = await env.DB.batch(ids.map((id) => env.DB.prepare("DELETE FROM traders WHERE id = ?").bind(id)));
+  return result.reduce((sum, item) => sum + (item.meta.changes ?? 0), 0);
 }
 
 export type LeaderboardBy = "sss" | "level" | "value";
@@ -194,9 +217,12 @@ export async function searchTraders(env: ListEnv, raw: string): Promise<Trader[]
   const escaped = query.replace(/[\\%_]/g, (char) => `\\${char}`);
   const rows = await env.DB.prepare(
     `SELECT ${TRADER_COLUMNS} FROM traders
-     WHERE name LIKE ?1 ESCAPE '\\' COLLATE NOCASE
-        OR username LIKE ?1 ESCAPE '\\' COLLATE NOCASE
-        OR IFNULL(kcc_name, '') LIKE ?1 ESCAPE '\\' COLLATE NOCASE
+     WHERE sss IS NOT NULL
+       AND (
+         name LIKE ?1 ESCAPE '\\' COLLATE NOCASE
+         OR username LIKE ?1 ESCAPE '\\' COLLATE NOCASE
+         OR IFNULL(kcc_name, '') LIKE ?1 ESCAPE '\\' COLLATE NOCASE
+       )
      ORDER BY
        CASE
          WHEN name LIKE ?2 ESCAPE '\\' COLLATE NOCASE
