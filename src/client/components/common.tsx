@@ -99,10 +99,10 @@ export function LegalDialog({
           <Dialog.Content
             onEscapeKeyDown={(event) => event.preventDefault()}
             onPointerDownOutside={(event) => event.preventDefault()}
-            className="fixed top-1/2 left-1/2 z-50 w-[min(28rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/10 bg-[#1a1528] p-6 text-white shadow-lg outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
+            className="fixed inset-x-4 top-1/2 z-50 w-auto max-w-md -translate-y-1/2 rounded-3xl border border-white/10 bg-[#1a1528] p-5 text-white shadow-lg outline-none sm:inset-x-auto sm:left-1/2 sm:w-[min(28rem,calc(100%-2rem))] sm:-translate-x-1/2 sm:p-6 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
           >
             <Dialog.Title className="font-display text-xl font-bold">Before you continue</Dialog.Title>
-            <Dialog.Description className="mt-2 text-sm text-white/70">
+            <Dialog.Description className="mt-2 text-sm leading-relaxed text-white/70">
               Please review the{" "}
               <button
                 type="button"
@@ -121,19 +121,19 @@ export function LegalDialog({
               </button>
               . Continuing means you agree to both.
             </Dialog.Description>
-            <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-3 text-sm text-white/80">
+            <label className="mt-4 flex cursor-pointer items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-3.5 text-sm leading-snug text-white/80 sm:mt-5">
               <input
                 type="checkbox"
                 checked={agreed}
                 onChange={(event) => setAgreed(event.target.checked)}
                 disabled={accepting}
-                className="mt-0.5 size-4 shrink-0 rounded border-white/30 bg-transparent accent-violet-300"
+                className="size-5 shrink-0 rounded border-white/30 bg-transparent accent-violet-300"
               />
-              <span>I agree to the terms of service and privacy policy.</span>
+              <span className="min-w-0">I agree to the terms and privacy policy.</span>
             </label>
             {error ? <p className="mt-3 text-sm text-rose-300">{error}</p> : null}
-            <div className="mt-5 flex justify-end">
-              <Button className="rounded-full" disabled={!agreed || accepting} onClick={onAccept}>
+            <div className="mt-4 sm:mt-5 sm:flex sm:justify-end">
+              <Button className="w-full rounded-full sm:w-auto" disabled={!agreed || accepting} onClick={onAccept}>
                 {accepting ? "Saving…" : "Continue"}
               </Button>
             </div>
@@ -144,23 +144,28 @@ export function LegalDialog({
       <Dialog.Root open={document !== null} onOpenChange={(next) => { if (!next) setDocument(null); }}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-[70] bg-black/60 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 z-[70] flex max-h-[min(44rem,calc(100%-2rem))] w-[min(40rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#141224] text-white shadow-lg outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-            <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
-              <Dialog.Title className="font-display text-lg font-bold">
-                {document === "privacy" ? "Privacy policy" : "Terms of service"}
-              </Dialog.Title>
+          <Dialog.Content className="fixed inset-x-0 bottom-0 top-[max(2.5rem,env(safe-area-inset-top))] z-[70] flex flex-col overflow-hidden rounded-t-3xl border border-white/10 border-b-0 bg-[#141224] text-white shadow-lg outline-none sm:inset-auto sm:top-1/2 sm:left-1/2 sm:bottom-auto sm:max-h-[min(44rem,calc(100%-2rem))] sm:w-[min(40rem,calc(100%-2rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:border-b data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-bottom-4 sm:data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-bottom-4 sm:data-closed:zoom-out-95">
+            <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
+              <div className="min-w-0">
+                <Dialog.Title className="truncate font-display text-lg font-bold">
+                  {document === "privacy" ? "Privacy policy" : "Terms of service"}
+                </Dialog.Title>
+                <Dialog.Description className="mt-0.5 text-xs text-white/45">
+                  Effective November 9, 2026
+                </Dialog.Description>
+              </div>
               <Dialog.Close asChild>
                 <Button
                   variant="ghost"
                   size="icon"
                   aria-label="Close"
-                  className="rounded-full text-white/70 hover:bg-white/10 hover:text-white"
+                  className="shrink-0 rounded-full text-white/70 hover:bg-white/10 hover:text-white"
                 >
                   <X />
                 </Button>
               </Dialog.Close>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-4">
               {document === "privacy" ? (
                 <PrivacyPage
                   embedded

@@ -13,17 +13,14 @@ const SECTIONS = [
 ] as const;
 
 export function PrivacyPage({
-  onOpen,
   embedded = false,
 }: {
-  onOpen: (page: Page, href: string) => void;
+  onOpen?: (page: Page, href: string) => void;
   embedded?: boolean;
 }) {
   return (
-    <div className={cn("mx-auto grid w-full gap-6", embedded ? "max-w-none gap-4" : "max-w-3xl")}>
-      {embedded ? (
-        <p className="text-xs text-white/45">Effective November 9, 2026</p>
-      ) : (
+    <div className={cn("mx-auto grid w-full gap-6", embedded ? "max-w-none gap-3" : "max-w-3xl")}>
+      {embedded ? null : (
         <section className="flex items-center gap-4 rounded-[1.75rem] border border-white/10 bg-[radial-gradient(110%_130%_at_0%_0%,rgba(186,176,255,0.18),transparent_55%),linear-gradient(160deg,#1c1833,#141224)] px-5 py-4 md:px-8 md:py-5">
           <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-violet-200/15 text-violet-200">
             <Shield className="size-5" />
@@ -38,19 +35,32 @@ export function PrivacyPage({
         </section>
       )}
 
-      <nav aria-label="Privacy sections" className="flex flex-wrap gap-2">
+      <nav
+        aria-label="Privacy sections"
+        className={cn(
+          "flex gap-2",
+          embedded
+            ? "-mx-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [mask-image:linear-gradient(90deg,#000_85%,transparent)] [&::-webkit-scrollbar]:hidden"
+            : "flex-wrap",
+        )}
+      >
         {SECTIONS.map((section) => (
           <a
             key={section.id}
             href={`#${section.id}`}
-            className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-white/75 outline-none hover:bg-white/[0.08] hover:text-white focus-visible:ring-3 focus-visible:ring-ring/50"
+            onClick={(event) => {
+              if (!embedded) return;
+              event.preventDefault();
+              document.getElementById(section.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+            className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-white/75 outline-none hover:bg-white/[0.08] hover:text-white focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             {section.label}
           </a>
         ))}
       </nav>
 
-      <Article id="collect" title="What we collect">
+      <Article id="collect" title="What we collect" compact={embedded}>
         <p>
           When you sign in with Discord, we receive the identity Discord shares for the{" "}
           <strong className="font-semibold text-white">identify</strong> scope: your Discord user id, username, display
@@ -68,7 +78,7 @@ export function PrivacyPage({
         </p>
       </Article>
 
-      <Article id="use" title="How we use it">
+      <Article id="use" title="How we use it" compact={embedded}>
         <p>
           We use this data to keep you signed in, sync your collection, match trades, show public trader pages and the
           leaderboard, and remember the preferences you choose in Settings.
@@ -76,7 +86,7 @@ export function PrivacyPage({
         <p>We do not sell your personal information, and we do not use it for advertising.</p>
       </Article>
 
-      <Article id="public" title="What others can see">
+      <Article id="public" title="What others can see" compact={embedded}>
         <p>
           Your public trader page can show your display name, avatar, KCC name, For trade and Wishlist, whether you are
           accepting trades, and whether you look inactive. Traders with a public KCC collection can also appear in search
@@ -88,7 +98,7 @@ export function PrivacyPage({
         </p>
       </Article>
 
-      <Article id="cookies" title="Cookies and local storage">
+      <Article id="cookies" title="Cookies and local storage" compact={embedded}>
         <p>
           After Discord sign-in we set an HttpOnly session cookie so the site can recognize you. It lasts up to 14 days.
           A short-lived cookie is used only during the Discord login redirect.
@@ -99,7 +109,7 @@ export function PrivacyPage({
         </p>
       </Article>
 
-      <Article id="third-parties" title="Third parties">
+      <Article id="third-parties" title="Third parties" compact={embedded}>
         <p>
           <strong className="font-semibold text-white">Discord</strong> authenticates you. Their handling of your Discord
           account is covered by Discord’s own privacy policy.
@@ -114,7 +124,7 @@ export function PrivacyPage({
         </p>
       </Article>
 
-      <Article id="retention" title="Retention and deletion">
+      <Article id="retention" title="Retention and deletion" compact={embedded}>
         <p>
           Account data stays while your trader record exists. Private traders who have not used the site for 30 days may
           be removed automatically, including their lists and synced collection cache.
@@ -134,51 +144,31 @@ export function PrivacyPage({
         </p>
       </Article>
 
-      <p className="text-sm text-white/55">
-        Site rules are in the{" "}
-        <PageLink page="terms" href="/terms" onOpen={onOpen}>
-          terms of service
-        </PageLink>
-        . For how syncing and lists work day to day, see{" "}
-        <PageLink page="help" href="/help" onOpen={onOpen}>
-          Help
-        </PageLink>
-        .
-      </p>
     </div>
   );
 }
 
-function Article({ id, title, children }: { id: string; title: string; children: ReactNode }) {
-  return (
-    <article id={id} className="scroll-mt-28 grid gap-3 rounded-3xl border border-white/10 bg-white/[0.03] p-5 md:p-6">
-      <h2 className="font-display text-xl font-bold tracking-tight">{title}</h2>
-      <div className="grid gap-3 text-sm leading-relaxed text-white/70">{children}</div>
-    </article>
-  );
-}
-
-function PageLink({
-  page,
-  href,
-  onOpen,
+function Article({
+  id,
+  title,
   children,
+  compact = false,
 }: {
-  page: Page;
-  href: string;
-  onOpen: (page: Page, href: string) => void;
+  id: string;
+  title: string;
   children: ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <a
-      href={href}
-      onClick={(event) => {
-        event.preventDefault();
-        onOpen(page, href);
-      }}
-      className="font-semibold text-white underline decoration-white/30 underline-offset-2 hover:decoration-white"
+    <article
+      id={id}
+      className={cn(
+        "grid gap-3 rounded-3xl border border-white/10 bg-white/[0.03]",
+        compact ? "scroll-mt-3 p-4" : "scroll-mt-28 p-5 md:p-6",
+      )}
     >
-      {children}
-    </a>
+      <h2 className={cn("font-display font-bold tracking-tight", compact ? "text-lg" : "text-xl")}>{title}</h2>
+      <div className="grid gap-3 text-sm leading-relaxed text-white/70">{children}</div>
+    </article>
   );
 }
