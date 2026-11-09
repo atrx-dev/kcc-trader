@@ -8,6 +8,7 @@ import { type SessionUser, type Lists, type ListSync, type ListName, type Page, 
 
 import { CardFace } from "./components/cards.tsx";
 import { formatSyncedAt, AdminButton, Brand, NavTabs, AccountMenu, HelpButton, LeaderboardButton, TraderSearch } from "./components/header.tsx";
+import { SiteFooter } from "./components/footer.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
 import { SettingsSheet } from "./components/SettingsSheet.tsx";
 import { EmptyState, Banner, GridSkeleton, Showcase, StatPill, LegalDialog, WelcomeDialog } from "./components/common.tsx";
@@ -893,8 +894,6 @@ export function App() {
               onListDuplicatesChange={(listDuplicates) => void savePreference({ listDuplicates })}
               signedIn={user !== null}
               onShowFeatures={() => setReplayFeatures(true)}
-              onOpenPrivacy={() => openPage("privacy", "/privacy")}
-              onOpenTerms={() => openPage("terms", "/terms")}
               onOpenAdmin={admin ? () => openPage("admin", "/admin") : undefined}
             />
             {userLoaded ? <AccountMenu user={user} privateProfile={needsPublicProfile} onOpen={openPage} /> : null}
@@ -1241,35 +1240,11 @@ export function App() {
         )}
       </main>
 
-      <footer className="mx-auto flex w-full max-w-[1400px] flex-col gap-1 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] text-xs text-white/40 sm:pb-10 md:px-8">
-        <p>
-          Card data and art from Koi Card Collector
-          {catalog?.syncedAt ? ` · synced ${formatSyncedAt(catalog.syncedAt)}` : ""}
-        </p>
-        <p>
-          <a
-            href="/help"
-            onClick={(event) => {
-              event.preventDefault();
-              openPage("help", "/help");
-            }}
-            className="text-white/60 underline-offset-2 hover:text-white hover:underline"
-          >
-            Help
-          </a>
-          {" · "}
-          Found a bug? Message{" "}
-          <a
-            href="https://discord.com/users/204699700316602369"
-            target="_blank"
-            rel="noreferrer"
-            className="text-white/60 underline-offset-2 hover:text-white hover:underline"
-          >
-            @atrx
-          </a>{" "}
-          on Discord.
-        </p>
-      </footer>
+      <SiteFooter
+        page={page}
+        catalogSyncedAt={catalog?.syncedAt ? formatSyncedAt(catalog.syncedAt) : null}
+        onOpen={openPage}
+      />
     </div>
   );
 }

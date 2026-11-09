@@ -26,8 +26,6 @@ export function SettingsSheet({
   onListDuplicatesChange,
   signedIn,
   onShowFeatures,
-  onOpenPrivacy,
-  onOpenTerms,
   onOpenAdmin,
 }: {
   settings: Settings;
@@ -45,8 +43,6 @@ export function SettingsSheet({
   onListDuplicatesChange: (listDuplicates: boolean) => void;
   signedIn: boolean;
   onShowFeatures: () => void;
-  onOpenPrivacy: () => void;
-  onOpenTerms: () => void;
   onOpenAdmin?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -394,29 +390,6 @@ export function SettingsSheet({
               </section>
             </SettingsGroup>
           ) : null}
-
-          <p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-2 text-sm text-white/45">
-            <button
-              type="button"
-              className="underline decoration-white/25 underline-offset-2 outline-none hover:text-white/70 hover:decoration-white/50 focus-visible:ring-3 focus-visible:ring-ring/50"
-              onClick={() => {
-                setOpen(false);
-                onOpenPrivacy();
-              }}
-            >
-              Privacy policy
-            </button>
-            <button
-              type="button"
-              className="underline decoration-white/25 underline-offset-2 outline-none hover:text-white/70 hover:decoration-white/50 focus-visible:ring-3 focus-visible:ring-ring/50"
-              onClick={() => {
-                setOpen(false);
-                onOpenTerms();
-              }}
-            >
-              Terms of service
-            </button>
-          </p>
         </div>
       </SheetContent>
       <DeleteAccountDialog open={deleteOpen} onOpenChange={setDeleteOpen} />
