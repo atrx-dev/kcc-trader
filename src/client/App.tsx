@@ -688,7 +688,9 @@ export function App() {
         const priority = new Set(match.priority ?? []);
         const theyHave = priorityFirst(cardsInCatalogOrder(match.theyHave, byKey), priority);
         const theyWant = priorityFirst(cardsInCatalogOrder(match.theyWant, byKey), priority);
-        return theyHave.length > 0 || theyWant.length > 0 ? [{ trader: match.trader, theyHave, theyWant, priority }] : [];
+        return theyHave.length > 0 || theyWant.length > 0
+          ? [{ trader: match.trader, theyHave, theyWant, priority, theyHaveCopies: match.theyHaveCopies }]
+          : [];
       }),
     [trades.matches, byKey],
   );

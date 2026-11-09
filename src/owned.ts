@@ -223,6 +223,24 @@ export function isSpare(duplicates: Record<string, number> | undefined, key: str
   return owned !== null && (duplicates?.[owned] ?? 0) > 1;
 }
 
+export function copiesForKeys(duplicates: Record<string, number>, keys: readonly string[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const key of keys) {
+    const owned = ownedKey(key);
+    if (!owned) continue;
+    const count = duplicates[owned] ?? 0;
+    if (count > 1) out[key] = count;
+  }
+  return out;
+}
+
+/** Cached collection duplicates only — no KCC refresh. Empty if missing or hidden. */
+export async function readCachedDuplicates(env: OwnedEnv, profileId: string): Promise<Record<string, number>> {
+  const cached = await env.CARDS.get<OwnedCards>(`owned:${profileId}`, "json");
+  if (!cached || !Array.isArray(cached.ss) || cached.hidden) return {};
+  return cached.duplicates ?? {};
+}
+
 export async function readOwned(env: OwnedEnv, profileId: string, refresh: boolean, force = false): Promise<OwnedResponse> {
   const cacheKey = `owned:${profileId}`;
   const cached = await env.CARDS.get<OwnedCards>(cacheKey, "json");

@@ -127,6 +127,14 @@ export interface TradeMatch {
   theyHave: string[];
   theyWant: string[];
   priority?: string[];
+  /** Their spare copy counts for theyHave keys (from their synced collection). */
+  theyHaveCopies?: Record<string, number>;
+}
+
+/** Copy badge count from a card_key → count map (only counts > 1). */
+export function listedCopies(card: Card, copies: Record<string, number> | undefined): number {
+  const count = copies?.[cardKey(card)] ?? 0;
+  return count > 1 ? count : 0;
 }
 
 export interface TradesState {

@@ -1,10 +1,13 @@
 import { TRADER_COLUMNS, traderFromRow, type ListEnv, type ListName, type Trader, type TraderRow } from "./lists.ts";
+import { copiesForKeys, readCachedDuplicates } from "./owned.ts";
 
 export interface TradeMatch {
   trader: Trader;
   theyHave: string[];
   theyWant: string[];
   priority: string[];
+  /** Their spare counts for cards in theyHave (from cached collection sync). */
+  theyHaveCopies?: Record<string, number>;
 }
 
 interface MatchRow extends TraderRow {
@@ -46,7 +49,10 @@ export async function wishlistDemand(env: ListEnv, userId: string): Promise<Reco
   return demand;
 }
 
-export async function findTrades(env: ListEnv, userId: string): Promise<TradeMatch[]> {
+export async function findTrades(
+  env: ListEnv & { CARDS: KVNamespace },
+  userId: string,
+): Promise<TradeMatch[]> {
   const { results } = await env.DB.prepare(MATCH_QUERY).bind(userId, Date.now() - INACTIVE_AFTER).all<MatchRow>();
   const byTrader = new Map<string, TradeMatch>();
   for (const row of results) {
@@ -60,16 +66,31 @@ export async function findTrades(env: ListEnv, userId: string): Promise<TradeMat
     if (row.wanted_priority) match.priority.push(row.card_key);
   }
 
+  const matches = [...byTrader.values()];
+  const profileIds = [...new Set(matches.map((match) => match.trader.kccId).filter(Boolean))] as string[];
+  const duplicatesByProfile = new Map<string, Record<string, number>>();
+  await Promise.all(
+    profileIds.map(async (profileId) => {
+      duplicatesByProfile.set(profileId, await readCachedDuplicates(env, profileId));
+    }),
+  );
+  for (const match of matches) {
+    const profileId = match.trader.kccId;
+    if (!profileId || match.theyHave.length === 0) continue;
+    const copies = copiesForKeys(duplicatesByProfile.get(profileId) ?? {}, match.theyHave);
+    if (Object.keys(copies).length > 0) match.theyHaveCopies = copies;
+  }
+
   const score = (match: TradeMatch) => Math.min(match.theyHave.length, match.theyWant.length);
   const priorityHits = (match: TradeMatch) => {
     const wanted = new Set(match.priority);
     return match.theyHave.reduce((count, key) => count + (wanted.has(key) ? 1 : 0), 0);
   };
-  return [...byTrader.values()].sort(
-      (a, b) =>
-        score(b) - score(a) ||
-        priorityHits(b) - priorityHits(a) ||
-        b.theyHave.length + b.theyWant.length - (a.theyHave.length + a.theyWant.length) ||
-        a.trader.name.localeCompare(b.trader.name),
-    );
+  return matches.sort(
+    (a, b) =>
+      score(b) - score(a) ||
+      priorityHits(b) - priorityHits(a) ||
+      b.theyHave.length + b.theyWant.length - (a.theyHave.length + a.theyWant.length) ||
+      a.trader.name.localeCompare(b.trader.name),
+  );
 }

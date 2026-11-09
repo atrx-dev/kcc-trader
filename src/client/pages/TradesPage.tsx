@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { cardKey, type Card } from "../../types.ts";
-import { duplicateCount, isOwned, kccTradeUrl, lastSeenLabel, tradeViewHref, type OwnedState, type Page, type SessionUser, type TradeView, type Trader } from "../model.ts";
+import { duplicateCount, isOwned, kccTradeUrl, lastSeenLabel, listedCopies, tradeViewHref, type OwnedState, type Page, type SessionUser, type TradeView, type Trader } from "../model.ts";
 import { CardFace } from "../components/cards.tsx";
 import { EmptyState } from "../components/common.tsx";
 
@@ -17,6 +17,7 @@ export interface ResolvedMatch {
   theyHave: Card[];
   theyWant: Card[];
   priority: Set<string>;
+  theyHaveCopies?: Record<string, number>;
 }
 
 export const MATCH_PREVIEW = 8;
@@ -28,6 +29,7 @@ export function MatchCards({
   owned,
   ownedMarks,
   priority,
+  copiesFor,
 }: {
   title: string;
   cards: Card[];
@@ -35,6 +37,7 @@ export function MatchCards({
   owned: OwnedState;
   ownedMarks: boolean;
   priority: Set<string>;
+  copiesFor?: (card: Card) => number;
 }) {
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? cards : cards.slice(0, MATCH_PREVIEW);
@@ -50,7 +53,13 @@ export function MatchCards({
       <div className="grid grid-cols-[repeat(auto-fill,minmax(min(92px,100%),1fr))] gap-2">
         {shown.map((card) => (
           <div key={cardKey(card)} className="trade-thumb min-w-0">
-            <CardFace card={card} copies={duplicateCount(card, owned)} owned={ownedMarks && isOwned(card, owned)} priority={priority.has(cardKey(card))} lazy />
+            <CardFace
+              card={card}
+              copies={copiesFor ? copiesFor(card) : duplicateCount(card, owned)}
+              owned={ownedMarks && isOwned(card, owned)}
+              priority={priority.has(cardKey(card))}
+              lazy
+            />
           </div>
         ))}
       </div>
@@ -79,7 +88,7 @@ export function TraderMatch({
   ownedMarks: boolean;
   onOpen: (page: Page, href: string) => void;
 }) {
-  const { trader, theyHave, theyWant, priority } = match;
+  const { trader, theyHave, theyWant, priority, theyHaveCopies } = match;
   const tradeUrl = kccTradeUrl(trader);
 
   return (
@@ -118,7 +127,15 @@ export function TraderMatch({
       </header>
       <div className={cn("grid min-w-0 gap-3", theyHave.length > 0 && theyWant.length > 0 && "md:grid-cols-2")}>
         {theyHave.length > 0 ? (
-          <MatchCards title="They have, you want" cards={theyHave} tone="bg-rose-300" owned={owned} ownedMarks={ownedMarks} priority={priority} />
+          <MatchCards
+            title="They have, you want"
+            cards={theyHave}
+            tone="bg-rose-300"
+            owned={owned}
+            ownedMarks={ownedMarks}
+            priority={priority}
+            copiesFor={(card) => listedCopies(card, theyHaveCopies)}
+          />
         ) : null}
         {theyWant.length > 0 ? (
           <MatchCards title="You have, they want" cards={theyWant} tone="bg-sky-300" owned={owned} ownedMarks={false} priority={priority} />

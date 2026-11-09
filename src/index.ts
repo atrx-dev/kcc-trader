@@ -19,7 +19,16 @@ import {
   type Preferences,
   type Trader,
 } from "./lists.ts";
-import { isSpare, ownsCard, readOwned, SyncCooldownError, type OwnedResponse, type SyncedProfile } from "./owned.ts";
+import {
+  copiesForKeys,
+  isSpare,
+  ownsCard,
+  readCachedDuplicates,
+  readOwned,
+  SyncCooldownError,
+  type OwnedResponse,
+  type SyncedProfile,
+} from "./owned.ts";
 import { profileEmbed, withProfileMeta } from "./embed.ts";
 import { isAdmin, profileSyncStatus, stepProfileSync } from "./admin.ts";
 import { addSsArtwork, catalogSyncStatus, discoverHiddenCards, ensureKccChanPromo, readCatalog, stepCatalogSync } from "./sync.ts";
@@ -226,7 +235,12 @@ export default {
     if (traderPath && request.method === "GET") {
       const lists = await readPublicLists(env, traderPath[1]);
       if (!lists) return Response.json({ error: "No lists for that trader" }, { status: 404 });
-      return Response.json(lists);
+      const duplicates = lists.trader.kccId ? await readCachedDuplicates(env, lists.trader.kccId) : {};
+      const forTradeCopies = copiesForKeys(duplicates, lists.forTrade);
+      return Response.json({
+        ...lists,
+        ...(Object.keys(forTradeCopies).length > 0 ? { forTradeCopies } : {}),
+      });
     }
 
     if (url.pathname === "/api/preferences" && request.method === "POST") {

@@ -76,6 +76,12 @@ export const FEATURES: FeatureNote[] = [
     body: "On For trade, Manage skipped cards keeps SS and SSS cards off duplicates listing. You can skip one before it is a spare.",
     image: "/features/skipped-cards.svg",
   },
+  {
+    id: "their-copies",
+    title: "Their copy counts",
+    body: "On Trades and on someone else's For trade, the gold chip shows how many copies they have — not only how many you have.",
+    image: "/features/their-copies.svg",
+  },
 ];
 
 function newestFirst(notes: readonly FeatureNote[]): FeatureNote[] {

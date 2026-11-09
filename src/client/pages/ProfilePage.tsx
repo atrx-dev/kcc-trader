@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { cardKey, type Card } from "../../types.ts";
-import { type SessionUser, type Lists, type Trader, INACTIVE_AFTER_DAYS, daysSince, lastSeenLabel, type OwnedState, type Filters, kccTradeUrl, cardsInCatalogOrder, priorityFirst, duplicateCount, isOwned, facetOptionsFor, filtersAreActive, applyFilters } from "../model.ts";
+import { type SessionUser, type Lists, type Trader, INACTIVE_AFTER_DAYS, daysSince, lastSeenLabel, type OwnedState, type Filters, kccTradeUrl, cardsInCatalogOrder, priorityFirst, duplicateCount, isOwned, listedCopies, facetOptionsFor, filtersAreActive, applyFilters } from "../model.ts";
 import { VirtualGrid } from "../VirtualGrid.tsx";
 import { CardFace } from "../components/cards.tsx";
 import { type OwnedControls, FilterBar } from "../components/controls.tsx";
@@ -13,6 +13,7 @@ import { EmptyState, GridSkeleton, ShareListsButton } from "../components/common
 
 export interface PublicLists extends Lists {
   trader: Trader;
+  forTradeCopies?: Record<string, number>;
 }
 
 export function ProfileSection({
@@ -29,6 +30,7 @@ export function ProfileSection({
   empty,
   owned,
   ownedMarks,
+  copiesFor,
 }: {
   id: string;
   title: string;
@@ -43,6 +45,7 @@ export function ProfileSection({
   empty: string;
   owned: OwnedState;
   ownedMarks: boolean;
+  copiesFor?: (card: Card) => number;
 }) {
   const count = `${cards.length.toLocaleString()} ${cards.length === 1 ? "card" : "cards"}`;
   return (
@@ -73,7 +76,12 @@ export function ProfileSection({
             const key = cardKey(card);
             return (
               <>
-                <CardFace card={card} copies={duplicateCount(card, owned)} owned={ownedMarks && isOwned(card, owned)} priority={priority?.has(key)} />
+                <CardFace
+                  card={card}
+                  copies={copiesFor ? copiesFor(card) : duplicateCount(card, owned)}
+                  owned={ownedMarks && isOwned(card, owned)}
+                  priority={priority?.has(key)}
+                />
                 {highlight.has(key) ? (
                   <span className="self-center rounded-full bg-emerald-300/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-200">
                     {highlightLabel}
@@ -297,6 +305,7 @@ export function ProfilePage({
             empty={filtering && forTrade.length > 0 ? "No cards for trade match your filters." : "Nothing listed for trade."}
             owned={owned}
             ownedMarks={own ? false : ownedMarks}
+            copiesFor={own ? undefined : (card) => listedCopies(card, state.lists!.forTradeCopies)}
           />
           <ProfileSection
             id="wishlist"
