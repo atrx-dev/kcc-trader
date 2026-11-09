@@ -183,6 +183,14 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
         </p>
         <p>You show up after you visit with a public collection. The numbers are the ones from your last sync.</p>
       </Article>
+
+      <p className="text-sm text-white/55">
+        How we handle account and trading data is in the{" "}
+        <PageLink page="privacy" href="/privacy" onOpen={onOpen}>
+          privacy policy
+        </PageLink>
+        .
+      </p>
     </div>
   );
 }

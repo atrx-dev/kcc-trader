@@ -17,6 +17,7 @@ import { LeaderboardPage } from "./pages/LeaderboardPage.tsx";
 import { ListPage } from "./pages/ListPage.tsx";
 import { AdminPage } from "./pages/AdminPage.tsx";
 import { HelpPage } from "./pages/HelpPage.tsx";
+import { PrivacyPage } from "./pages/PrivacyPage.tsx";
 import { FeatureDialog } from "./components/FeatureDialog.tsx";
 import { FEATURES, SEEN_FEATURE_KEY, unseenFeatures } from "./features.ts";
 
@@ -759,6 +760,7 @@ export function App() {
     trades: null,
     profile: null,
     help: null,
+    privacy: null,
     leaderboard: null,
     admin: null,
   };
@@ -835,6 +837,7 @@ export function App() {
               onListDuplicatesChange={(listDuplicates) => void savePreference({ listDuplicates })}
               signedIn={user !== null}
               onShowFeatures={() => setReplayFeatures(true)}
+              onOpenPrivacy={() => openPage("privacy", "/privacy")}
               onOpenAdmin={admin ? () => openPage("admin", "/admin") : undefined}
             />
             {userLoaded ? <AccountMenu user={user} privateProfile={needsPublicProfile} onOpen={openPage} /> : null}
@@ -969,6 +972,8 @@ export function App() {
           <AdminPage />
         ) : page === "help" ? (
           <HelpPage onOpen={openPage} />
+        ) : page === "privacy" ? (
+          <PrivacyPage onOpen={openPage} />
         ) : page === "leaderboard" ? (
           <LeaderboardPage
             by={leaderboardBy}
