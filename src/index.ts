@@ -1,4 +1,4 @@
-import { beginDiscordLogin, finishDiscordLogin, logout, readSession, sessionCookie, type AuthEnv, type SessionUser } from "./auth.ts";
+import { beginDiscordLogin, clearSessionCookie, finishDiscordLogin, logout, readSession, sessionCookie, type AuthEnv, type SessionUser } from "./auth.ts";
 import {
   changeLists,
   parseChanges,
@@ -255,6 +255,25 @@ export default {
         ...lists,
         ...(Object.keys(forTradeCopies).length > 0 ? { forTradeCopies } : {}),
       });
+    }
+
+    if (url.pathname === "/api/account/delete" && request.method === "POST") {
+      const user = await readSession(request, env);
+      if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
+      const row = await env.DB.prepare("SELECT kcc_id FROM traders WHERE id = ?")
+        .bind(user.id)
+        .first<{ kcc_id: string | null }>();
+      const profileIds = new Set(
+        [user.id, user.profile?.id, row?.kcc_id].filter((id): id is string => Boolean(id)),
+      );
+      await deleteTraders(env, [user.id]);
+      await Promise.all(
+        [...profileIds].flatMap((profileId) => [
+          removeKey(env, `owned:${profileId}`),
+          removeKey(env, `owned-sync:${profileId}`),
+        ]),
+      );
+      return Response.json({ ok: true }, { headers: { "Set-Cookie": clearSessionCookie(request) } });
     }
 
     if (url.pathname === "/api/preferences" && request.method === "POST") {

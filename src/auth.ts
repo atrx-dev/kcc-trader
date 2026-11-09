@@ -241,8 +241,12 @@ export async function finishDiscordLogin(
   }
 }
 
+export function clearSessionCookie(request: Request): string {
+  return `${COOKIE}=; ${cookieSuffix(request, 0)}`;
+}
+
 export function logout(request: Request): Response {
-  return redirect("/", [`${COOKIE}=; ${cookieSuffix(request, 0)}`]);
+  return redirect("/", [clearSessionCookie(request)]);
 }
 
 export async function readSession(request: Request, env: AuthEnv): Promise<SessionUser | null> {

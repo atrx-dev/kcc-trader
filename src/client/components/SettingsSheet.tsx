@@ -1,6 +1,8 @@
 import { Fragment, useMemo, useState, type ReactNode } from "react";
-import { Eye, EyeOff, RotateCcw, Settings2 } from "lucide-react";
+import { Dialog } from "radix-ui";
+import { Eye, EyeOff, RotateCcw, Settings2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -44,6 +46,7 @@ export function SettingsSheet({
   onOpenAdmin?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const visibleRarities = rarities.filter((rarity) => !settings.hiddenRarities.includes(rarity));
   const defaults = settings.catalogDefaults;
   const counts = useMemo(
@@ -347,6 +350,26 @@ export function SettingsSheet({
             </section>
           </SettingsGroup>
 
+          {signedIn ? (
+            <SettingsGroup title="Account">
+              <section className="flex items-center justify-between gap-4">
+                <div>
+                  <h4 className="font-display text-base font-bold">Delete account</h4>
+                  <p className="text-sm text-white/60">
+                    Permanently remove your lists, trade preferences, and synced collection data.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="shrink-0 rounded-full border-rose-400/40 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  Delete
+                </Button>
+              </section>
+            </SettingsGroup>
+          ) : null}
+
           {onOpenAdmin ? (
             <SettingsGroup title="Admin">
               <section className="flex items-center justify-between gap-4">
@@ -369,7 +392,98 @@ export function SettingsSheet({
           ) : null}
         </div>
       </SheetContent>
+      <DeleteAccountDialog open={deleteOpen} onOpenChange={setDeleteOpen} />
     </Sheet>
+  );
+}
+
+function DeleteAccountDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const [confirm, setConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canDelete = confirm.trim().toLowerCase() === "delete";
+
+  async function deleteAccount() {
+    if (!canDelete || deleting) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/account/delete", { method: "POST" });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "Could not delete your account");
+      }
+      window.location.href = "/";
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not delete your account");
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) {
+          setConfirm("");
+          setError(null);
+          setDeleting(false);
+        }
+        onOpenChange(next);
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/60 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
+        <Dialog.Content className="fixed top-1/2 left-1/2 z-[60] w-[min(28rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/10 bg-[#1a1528] p-6 text-white shadow-lg outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+          <div className="pr-10">
+            <Dialog.Title className="font-display text-xl font-bold">Delete account</Dialog.Title>
+            <Dialog.Description className="mt-1 text-sm text-white/65">
+              This permanently removes your lists, trade preferences, and synced collection data from KCC Trader. It
+              cannot be undone.
+            </Dialog.Description>
+          </div>
+          <Dialog.Close asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Close"
+              className="absolute top-3 right-3 rounded-full text-white/70 hover:bg-white/10 hover:text-white"
+            >
+              <X />
+            </Button>
+          </Dialog.Close>
+          <label className="mt-5 flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-white/50">
+              Type <span className="text-white/80">delete</span> to confirm
+            </span>
+            <Input
+              value={confirm}
+              onChange={(event) => setConfirm(event.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+              disabled={deleting}
+              className="h-10 border-white/10 bg-white/[0.04] text-white"
+            />
+          </label>
+          {error ? <p className="mt-3 text-sm text-rose-300">{error}</p> : null}
+          <div className="mt-5 flex justify-end gap-2">
+            <Dialog.Close asChild>
+              <Button variant="ghost" className="rounded-full text-white/70" disabled={deleting}>
+                Cancel
+              </Button>
+            </Dialog.Close>
+            <Button
+              variant="outline"
+              className="rounded-full border-rose-400/40 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100"
+              disabled={!canDelete || deleting}
+              onClick={() => void deleteAccount()}
+            >
+              {deleting ? "Deleting…" : "Delete account"}
+            </Button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
