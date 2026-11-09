@@ -12,16 +12,41 @@ export function SiteFooter({
   page,
   catalogSyncedAt,
   onOpen,
+  className,
 }: {
   page: Page;
   catalogSyncedAt?: string | null;
   onOpen: (page: Page, href: string) => void;
+  className?: string;
 }) {
   return (
-    <footer className="mt-auto border-t border-white/[0.08] bg-[radial-gradient(80%_120%_at_10%_0%,rgba(243,213,143,0.08),transparent_45%),radial-gradient(70%_100%_at_90%_100%,rgba(186,176,255,0.1),transparent_50%),linear-gradient(180deg,#161325,#12101f)]">
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 px-4 pt-8 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:pb-10 md:px-8">
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
+    <footer className={cn("mt-auto relative overflow-hidden border-t border-white/[0.08]", className)}>
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[radial-gradient(55%_80%_at_0%_0%,rgba(253,231,176,0.14),transparent_55%),radial-gradient(50%_70%_at_100%_100%,rgba(245,156,192,0.12),transparent_50%),radial-gradient(40%_60%_at_70%_0%,rgba(196,181,253,0.1),transparent_45%),linear-gradient(180deg,#171428,#100e1a)]"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(253,231,176,0.55),rgba(245,156,192,0.45),transparent)]"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute top-6 right-[12%] size-24 rounded-full bg-amber-200/10 blur-3xl"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-0 left-[30%] size-32 rounded-full bg-fuchsia-300/10 blur-3xl"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-6 -bottom-14 font-display text-[10rem] leading-none font-extrabold tracking-tighter text-white/[0.04] select-none sm:-right-4 sm:text-[13rem]"
+      >
+        KCC
+      </div>
+
+      <div className="relative mx-auto flex w-full max-w-[1400px] flex-col gap-8 px-4 pt-10 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:pb-12 md:px-8">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 max-w-xl">
             <a
               href="/"
               aria-label="KCC Trader"
@@ -31,30 +56,40 @@ export function SiteFooter({
                 onOpen("catalog", "/");
               }}
             >
-              <span className="grid size-9 place-items-center rounded-xl bg-[linear-gradient(135deg,#fde7b0,#f3c46f_45%,#f59cc0)] text-[#2a1a08] shadow-[0_8px_24px_-10px_rgba(245,156,192,0.9)]">
-                <Sparkles className="size-[1.1rem]" strokeWidth={2.4} />
+              <span className="grid size-11 place-items-center rounded-2xl bg-[linear-gradient(135deg,#fde7b0,#f3c46f_45%,#f59cc0)] text-[#2a1a08] shadow-[0_8px_24px_-10px_rgba(245,156,192,0.9)]">
+                <Sparkles className="size-5" strokeWidth={2.4} />
               </span>
-              <span className="font-display text-xl leading-none font-extrabold tracking-tight">
+              <span className="font-display text-2xl leading-none font-extrabold tracking-tight">
                 KCC <span className="text-amber-200">Trader</span>
               </span>
             </a>
-            <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/50">
-              A fan-made helper for finding Koi Card Collector trades. Not affiliated with KCC or Discord.
+            <p className="mt-4 max-w-md font-display text-lg leading-snug font-semibold tracking-tight text-white/70">
+              Find the trade. Keep the collection moving.
+            </p>
+            <p className="mt-2 max-w-sm text-sm leading-relaxed text-white/45">
+              Fan-made for Koi Card Collector players. Not affiliated with KCC or Discord.
             </p>
           </div>
 
-          <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-1 gap-y-1 sm:justify-end">
-            {LINKS.map((link, index) => (
-              <span key={link.href} className="contents">
-                {index > 0 ? <span className="px-1.5 text-white/20" aria-hidden="true">·</span> : null}
-                <FooterLink
-                  href={link.href}
-                  active={page === link.page}
-                  onClick={() => onOpen(link.page, link.href)}
-                >
-                  {link.label}
-                </FooterLink>
-              </span>
+          <nav aria-label="Footer" className="flex flex-wrap gap-2 lg:justify-end">
+            {LINKS.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                aria-current={page === link.page ? "page" : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  onOpen(link.page, link.href);
+                }}
+                className={cn(
+                  "rounded-2xl border px-3.5 py-2 text-sm outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
+                  page === link.page
+                    ? "border-amber-200/30 bg-amber-200/10 text-amber-50"
+                    : "border-white/10 bg-white/[0.03] text-white/70 hover:border-white/20 hover:bg-white/[0.06] hover:text-white",
+                )}
+              >
+                {link.label}
+              </a>
             ))}
           </nav>
         </div>
@@ -87,34 +122,5 @@ export function SiteFooter({
         </div>
       </div>
     </footer>
-  );
-}
-
-function FooterLink({
-  href,
-  children,
-  onClick,
-  active,
-}: {
-  href: string;
-  children: string;
-  onClick: () => void;
-  active: boolean;
-}) {
-  return (
-    <a
-      href={href}
-      aria-current={active ? "page" : undefined}
-      onClick={(event) => {
-        event.preventDefault();
-        onClick();
-      }}
-      className={cn(
-        "rounded-full px-2.5 py-1.5 text-sm outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
-        active ? "bg-white/[0.08] text-white" : "text-white/65 hover:bg-white/[0.06] hover:text-white",
-      )}
-    >
-      {children}
-    </a>
   );
 }
