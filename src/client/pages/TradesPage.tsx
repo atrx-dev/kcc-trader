@@ -36,17 +36,17 @@ export function MatchCards({
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? cards : cards.slice(0, MATCH_PREVIEW);
   return (
-    <div className="grid content-start gap-3 rounded-[14px] border border-white/[0.06] bg-white/[0.03] p-4">
-      <p className="flex items-center justify-between gap-2 text-sm font-semibold">
-        <span className="flex items-center gap-2">
-          <span className={cn("size-2 rounded-full", tone)} />
-          {title}
+    <div className="grid min-w-0 content-start gap-3 rounded-[14px] border border-white/[0.06] bg-white/[0.03] p-4">
+      <p className="flex min-w-0 items-center justify-between gap-2 text-sm font-semibold">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className={cn("size-2 shrink-0 rounded-full", tone)} />
+          <span className="min-w-0 truncate">{title}</span>
         </span>
-        <span className="rounded-full bg-white/[0.08] px-2 py-0.5 text-xs text-white/70 tabular-nums">{cards.length}</span>
+        <span className="shrink-0 rounded-full bg-white/[0.08] px-2 py-0.5 text-xs text-white/70 tabular-nums">{cards.length}</span>
       </p>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(92px,100%),1fr))] gap-2">
         {shown.map((card) => (
-          <div key={cardKey(card)} className="trade-thumb">
+          <div key={cardKey(card)} className="trade-thumb min-w-0">
             <CardFace card={card} copies={duplicateCount(card, owned)} owned={ownedMarks && isOwned(card, owned)} priority={priority.has(cardKey(card))} />
           </div>
         ))}
@@ -80,38 +80,40 @@ export function TraderMatch({
   const tradeUrl = kccTradeUrl(trader);
 
   return (
-    <article className="grid gap-4 rounded-3xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
-      <header className="flex flex-wrap items-center gap-3">
-        <Avatar className="size-11">
-          <AvatarImage src={trader.avatarUrl} alt="" />
-          <AvatarFallback>{trader.name.slice(0, 1)}</AvatarFallback>
-        </Avatar>
-        <div className="min-w-0 flex-1">
-          <a
-            href={`/u/${trader.id}`}
-            onClick={(event) => {
-              event.preventDefault();
-              onOpen("profile", `/u/${trader.id}`);
-            }}
-            className="block truncate font-display text-lg leading-tight font-bold hover:text-amber-100 hover:underline"
-          >
-            {trader.name}
-          </a>
-          <p className="truncate text-sm text-white/55">
-            @{trader.username}
-            {trader.kccName ? ` · ${trader.kccName} on KCC` : ""}
-            {trader.lastSeenAt ? ` · ${lastSeenLabel(trader.lastSeenAt)}` : ""}
-          </p>
+    <article className="grid min-w-0 gap-4 overflow-x-clip rounded-3xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
+      <header className="grid min-w-0 gap-3 md:flex md:items-center">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <Avatar className="size-11 shrink-0">
+            <AvatarImage src={trader.avatarUrl} alt="" />
+            <AvatarFallback>{trader.name.slice(0, 1)}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <a
+              href={`/u/${trader.id}`}
+              onClick={(event) => {
+                event.preventDefault();
+                onOpen("profile", `/u/${trader.id}`);
+              }}
+              className="block truncate font-display text-lg leading-tight font-bold hover:text-amber-100 hover:underline"
+            >
+              {trader.name}
+            </a>
+            <p className="truncate text-sm text-white/55">
+              @{trader.username}
+              {trader.kccName ? ` · ${trader.kccName} on KCC` : ""}
+              {trader.lastSeenAt ? ` · ${lastSeenLabel(trader.lastSeenAt)}` : ""}
+            </p>
+          </div>
         </div>
-        <Button asChild size="sm" className="rounded-full bg-emerald-300 text-emerald-950 hover:bg-emerald-200">
+        <Button asChild size="sm" className="w-full rounded-full bg-emerald-300 text-emerald-950 hover:bg-emerald-200 md:w-auto">
           <a href={tradeUrl} target="_blank" rel="noreferrer">
             <ArrowLeftRight />
             Offer a trade on KCC
-            <ExternalLink />
+            <ExternalLink className="shrink-0" />
           </a>
         </Button>
       </header>
-      <div className={cn("grid gap-3", theyHave.length > 0 && theyWant.length > 0 && "md:grid-cols-2")}>
+      <div className={cn("grid min-w-0 gap-3", theyHave.length > 0 && theyWant.length > 0 && "md:grid-cols-2")}>
         {theyHave.length > 0 ? (
           <MatchCards title="They have, you want" cards={theyHave} tone="bg-rose-300" owned={owned} ownedMarks={ownedMarks} priority={priority} />
         ) : null}
@@ -227,7 +229,7 @@ export function TradesPage({
 
   return (
     <>
-      <section className="flex items-center gap-4 rounded-[1.75rem] border border-white/10 bg-[radial-gradient(110%_130%_at_0%_0%,rgba(110,231,183,0.18),transparent_55%),linear-gradient(160deg,#18242a,#141224)] px-5 py-4 md:px-8 md:py-5">
+      <section className="flex min-w-0 items-center gap-4 rounded-[1.75rem] border border-white/10 bg-[radial-gradient(110%_130%_at_0%_0%,rgba(110,231,183,0.18),transparent_55%),linear-gradient(160deg,#18242a,#141224)] px-5 py-4 md:px-8 md:py-5">
         <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-emerald-300/15 text-emerald-300">
           <Handshake className="size-5" />
         </span>
@@ -244,7 +246,7 @@ export function TradesPage({
       </section>
 
       {ready ? (
-        <div role="tablist" aria-label="Trade overlaps" className="flex gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1">
+        <div role="tablist" aria-label="Trade overlaps" className="grid min-w-0 grid-cols-3 gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1">
           {VIEWS.map((item) => {
             const active = view === item.id;
             const Icon = item.icon;
@@ -259,13 +261,13 @@ export function TradesPage({
                   onView(item.id);
                 }}
                 className={cn(
-                  "flex h-9 min-w-0 flex-1 items-center justify-center gap-2 rounded-full px-2 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  "flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-full px-1.5 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:gap-2 sm:px-2",
                   active ? "bg-[#f3d58f] text-[#1b1509]" : "text-white/70 hover:bg-white/[0.07] hover:text-white",
                 )}
               >
                 <Icon className={cn("size-4 shrink-0", active ? "text-[#1b1509]" : item.tone)} />
-                <span className="truncate">{item.label}</span>
-                <span className={cn("tabular-nums", active ? "text-[#1b1509]/70" : "text-white/45")}>{counts[item.id]}</span>
+                <span className="min-w-0 truncate">{item.label}</span>
+                <span className={cn("shrink-0 tabular-nums", active ? "text-[#1b1509]/70" : "text-white/45")}>{counts[item.id]}</span>
               </a>
             );
           })}
@@ -337,7 +339,7 @@ export function TradesPage({
           {emptyBody(view, wishlistEmpty, forTradeEmpty)}
         </EmptyState>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid min-w-0 gap-4">
           {shown.map((match) => (
             <TraderMatch key={match.trader.id} match={match} owned={owned} ownedMarks={ownedMarks} onOpen={onOpen} />
           ))}

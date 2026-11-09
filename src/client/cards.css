@@ -66,21 +66,23 @@
   transition: transform 0.16s ease-out, filter 0.16s ease-out;
 }
 
-.trade-thumb:hover,
-.trade-thumb:focus-within {
-  z-index: 30;
-}
+@media (hover: hover) and (pointer: fine) {
+  .trade-thumb:hover,
+  .trade-thumb:focus-within {
+    z-index: 30;
+  }
 
-.trade-thumb:hover .card-stack,
-.trade-thumb:focus-within .card-stack {
-  transform: scale(2.6);
-  filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.55));
-}
-
-@container (min-width: 150px) {
   .trade-thumb:hover .card-stack,
   .trade-thumb:focus-within .card-stack {
-    transform: scale(1.85);
+    transform: scale(2.6);
+    filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.55));
+  }
+
+  @container (min-width: 150px) {
+    .trade-thumb:hover .card-stack,
+    .trade-thumb:focus-within .card-stack {
+      transform: scale(1.85);
+    }
   }
 }
 

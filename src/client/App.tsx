@@ -774,7 +774,7 @@ export function App() {
         />
       </div>
 
-      <main className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 px-4 py-6 md:px-8 md:py-10">
+      <main className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-1 flex-col gap-6 overflow-x-clip px-4 py-6 md:px-8 md:py-10">
         {authError ? <Banner>{authError}</Banner> : null}
         {error ? <Banner>{error}</Banner> : null}
         {listError ? <Banner onDismiss={() => setListError(null)}>{listError}</Banner> : null}
