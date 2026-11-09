@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { ArrowLeftRight, ExternalLink, Handshake, Heart, LogIn, RotateCcw, SearchX } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,8 @@ import { cardKey, type Card } from "../../types.ts";
 import { duplicateCount, isOwned, kccTradeUrl, lastSeenLabel, tradeViewHref, type OwnedState, type Page, type SessionUser, type TradeView, type Trader } from "../model.ts";
 import { CardFace } from "../components/cards.tsx";
 import { EmptyState } from "../components/common.tsx";
+
+const MATCH_GAP = 16;
 
 export interface ResolvedMatch {
   trader: Trader;
@@ -47,7 +50,7 @@ export function MatchCards({
       <div className="grid grid-cols-[repeat(auto-fill,minmax(min(92px,100%),1fr))] gap-2">
         {shown.map((card) => (
           <div key={cardKey(card)} className="trade-thumb min-w-0">
-            <CardFace card={card} copies={duplicateCount(card, owned)} owned={ownedMarks && isOwned(card, owned)} priority={priority.has(cardKey(card))} />
+            <CardFace card={card} copies={duplicateCount(card, owned)} owned={ownedMarks && isOwned(card, owned)} priority={priority.has(cardKey(card))} lazy />
           </div>
         ))}
       </div>
@@ -80,7 +83,7 @@ export function TraderMatch({
   const tradeUrl = kccTradeUrl(trader);
 
   return (
-    <article className="grid min-w-0 gap-4 overflow-x-clip rounded-3xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
+    <article className="grid min-w-0 gap-4 rounded-3xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
       <header className="grid min-w-0 gap-3 md:flex md:items-center">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Avatar className="size-11 shrink-0">
@@ -183,6 +186,89 @@ function compareView(view: TradeView) {
       a.trader.name.localeCompare(b.trader.name)
     );
   };
+}
+
+function estimateMatchSize(match: ResolvedMatch): number {
+  const hasHave = match.theyHave.length > 0;
+  const hasWant = match.theyWant.length > 0;
+  const preview = Math.max(
+    hasHave ? Math.min(match.theyHave.length, MATCH_PREVIEW) : 0,
+    hasWant ? Math.min(match.theyWant.length, MATCH_PREVIEW) : 0,
+    1,
+  );
+  const rows = Math.ceil(preview / 3);
+  const panel = 88 + rows * 148;
+  const stacked = typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+  const panels = (hasHave ? 1 : 0) + (hasWant ? 1 : 0);
+  return 150 + (stacked && panels > 1 ? panels * panel : panel);
+}
+
+function MatchList({
+  matches,
+  owned,
+  ownedMarks,
+  onOpen,
+}: {
+  matches: ResolvedMatch[];
+  owned: OwnedState;
+  ownedMarks: boolean;
+  onOpen: (page: Page, href: string) => void;
+}) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  const listKey = matches.map((match) => match.trader.id).join("\0");
+  const virtualizer = useWindowVirtualizer({
+    count: matches.length,
+    estimateSize: (index) => estimateMatchSize(matches[index]!),
+    overscan: 3,
+    gap: MATCH_GAP,
+    scrollMargin,
+    getItemKey: (index) => matches[index]!.trader.id,
+    measureElement: (element) => (element as HTMLElement).offsetHeight,
+  });
+
+  useLayoutEffect(() => {
+    const node = frameRef.current;
+    if (!node) return;
+    const apply = () => {
+      const nextMargin = node.getBoundingClientRect().top + window.scrollY;
+      setScrollMargin((current) => (Math.abs(current - nextMargin) < 0.5 ? current : nextMargin));
+    };
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(node);
+    window.addEventListener("resize", apply);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", apply);
+    };
+  }, [listKey]);
+
+  const rows = virtualizer.getVirtualItems();
+  const first = rows[0];
+  const last = rows[rows.length - 1];
+  const paddingTop = first ? Math.max(0, first.start - scrollMargin) : 0;
+  const paddingBottom = last ? Math.max(0, virtualizer.getTotalSize() - (last.end - scrollMargin)) : 0;
+
+  return (
+    <div ref={frameRef} className="virtual-grid min-w-0" data-scrolling={virtualizer.isScrolling ? "" : undefined}>
+      <div key={listKey} className="w-full" style={{ paddingTop, paddingBottom }}>
+        {rows.map((row, order) => {
+          const match = matches[row.index]!;
+          return (
+            <div
+              key={row.key}
+              data-index={row.index}
+              ref={virtualizer.measureElement}
+              style={{ marginBottom: order === rows.length - 1 ? 0 : MATCH_GAP }}
+            >
+              <TraderMatch match={match} owned={owned} ownedMarks={ownedMarks} onOpen={onOpen} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export function TradesPage({
@@ -339,11 +425,7 @@ export function TradesPage({
           {emptyBody(view, wishlistEmpty, forTradeEmpty)}
         </EmptyState>
       ) : (
-        <div className="grid min-w-0 gap-4">
-          {shown.map((match) => (
-            <TraderMatch key={match.trader.id} match={match} owned={owned} ownedMarks={ownedMarks} onOpen={onOpen} />
-          ))}
-        </div>
+        <MatchList matches={shown} owned={owned} ownedMarks={ownedMarks} onOpen={onOpen} />
       )}
     </>
   );

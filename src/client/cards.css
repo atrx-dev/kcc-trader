@@ -64,12 +64,19 @@
 .trade-thumb .card-stack {
   transform-origin: center;
   transition: transform 0.16s ease-out, filter 0.16s ease-out;
+  /* Keep hit-testing on the unscaled thumb so a zoomed card doesn't block neighbors. */
+  pointer-events: none;
 }
 
 @media (hover: hover) and (pointer: fine) {
+  .trade-thumb {
+    transition: z-index 0s linear 0.16s;
+  }
+
   .trade-thumb:hover,
   .trade-thumb:focus-within {
     z-index: 30;
+    transition: z-index 0s;
   }
 
   .trade-thumb:hover .card-stack,

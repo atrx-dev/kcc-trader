@@ -186,6 +186,7 @@ export function CardFace({
   owned = false,
   priority = false,
   wanted = 0,
+  lazy = false,
   onPriority,
 }: {
   card: Card;
@@ -193,6 +194,7 @@ export function CardFace({
   owned?: boolean;
   priority?: boolean;
   wanted?: number;
+  lazy?: boolean;
   onPriority?: () => void;
 }) {
   const holo = card.rank === "S" || card.rank === "SS" || card.rank === "SSS";
@@ -210,11 +212,11 @@ export function CardFace({
       aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${fresh ? ", new" : ""}${priority ? ", priority" : ""}${copies > 1 ? `, ${copies} copies` : owned ? ", owned" : ""}${wanted > 0 ? `, wishlisted by ${wanted}` : ""}`}
     >
       {card.image ? (
-        <img className="card-artwork" src={card.image} alt="" decoding="async" />
+        <img className="card-artwork" src={card.image} alt="" decoding="async" loading={lazy ? "lazy" : undefined} />
       ) : (
         <div className="art-fallback" />
       )}
-      {framed ? <img className="card-border" src={frameUrl(card)} alt="" decoding="async" /> : null}
+      {framed ? <img className="card-border" src={frameUrl(card)} alt="" decoding="async" loading={lazy ? "lazy" : undefined} /> : null}
       {framed ? (
         <footer style={namePlateStyle(card)}>
           <strong title={card.variantName ? `${card.name} (${card.variantName})` : card.name}>{card.name}</strong>
