@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { Page } from "../model.ts";
-import { BrandLink } from "./brand.tsx";
+import { BrandLink, TradeMark } from "./brand.tsx";
 
 const LINKS: { page: Page; href: string; label: string }[] = [
   { page: "help", href: "/help", label: "Help" },
@@ -37,12 +37,7 @@ export function SiteFooter({
         aria-hidden="true"
         className="pointer-events-none absolute bottom-0 left-[30%] size-32 rounded-full bg-fuchsia-300/10 blur-3xl"
       />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -right-6 -bottom-14 font-display text-[10rem] leading-none font-extrabold tracking-tighter text-white/[0.04] select-none sm:-right-4 sm:text-[13rem]"
-      >
-        KCC
-      </div>
+      <TradeMark className="pointer-events-none absolute -right-8 -bottom-16 size-64 opacity-[0.07] select-none sm:-right-6 sm:-bottom-20 sm:size-80" />
 
       <div className="relative mx-auto flex w-full max-w-[1400px] flex-col gap-8 px-4 pt-10 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:pb-12 md:px-8">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
