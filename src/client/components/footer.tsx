@@ -23,19 +23,19 @@ export function SiteFooter({
     <footer className={cn("mt-auto relative overflow-hidden border-t border-white/[0.08]", className)}>
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-[radial-gradient(55%_80%_at_0%_0%,rgba(253,231,176,0.14),transparent_55%),radial-gradient(50%_70%_at_100%_100%,rgba(245,156,192,0.12),transparent_50%),radial-gradient(40%_60%_at_70%_0%,rgba(196,181,253,0.1),transparent_45%),linear-gradient(180deg,#171428,#100e1a)]"
+        className="absolute inset-0 bg-[radial-gradient(55%_80%_at_0%_0%,rgba(255,255,255,0.06),transparent_55%),radial-gradient(50%_70%_at_100%_100%,rgba(253,231,176,0.07),transparent_55%),linear-gradient(180deg,#16141f,#100e16)]"
       />
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(253,231,176,0.55),rgba(245,156,192,0.45),transparent)]"
+        className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.28),rgba(253,231,176,0.25),transparent)]"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute top-6 right-[12%] size-24 rounded-full bg-amber-200/10 blur-3xl"
+        className="pointer-events-none absolute top-6 right-[12%] size-24 rounded-full bg-white/5 blur-3xl"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute bottom-0 left-[30%] size-32 rounded-full bg-fuchsia-300/10 blur-3xl"
+        className="pointer-events-none absolute bottom-0 left-[30%] size-32 rounded-full bg-amber-200/6 blur-3xl"
       />
       <TradeMark className="pointer-events-none absolute -right-8 -bottom-16 size-64 opacity-[0.07] select-none sm:-right-6 sm:-bottom-20 sm:size-80" />
 
