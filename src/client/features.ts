@@ -77,6 +77,12 @@ export const FEATURES: FeatureNote[] = [
     image: "/features/skipped-cards.svg",
   },
   {
+    id: "trades-perf",
+    title: "Snappier Trades",
+    body: "A long match list used to weigh Trades down. It should feel much quicker now — cards further down the list load as you scroll.",
+    image: "/features/trades-perf.svg",
+  },
+  {
     id: "their-copies",
     title: "Their copy counts",
     body: "On Trades and on someone else's For trade, the gold chip shows how many copies they have — not only how many you have.",
