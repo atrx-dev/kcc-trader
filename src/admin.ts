@@ -1,6 +1,6 @@
 import { recordCollection, syncLists, type CollectionStats } from "./lists.ts";
 import { isSpare, ownsCard, readOwned, type OwnedResponse, type SyncedProfile } from "./owned.ts";
-import { addSsArtwork, readCatalog } from "./sync.ts";
+import { addSsArtwork, readCatalog, removeKey } from "./sync.ts";
 import { cardKey } from "./types.ts";
 
 /** Discord ids allowed to open the admin panel. */
@@ -87,7 +87,8 @@ export async function stepProfileSync(env: AdminEnv, restart: boolean): Promise<
     const job = await env.CARDS.get<ProfileJob>(JOB_KEY, "json");
     return job ? progressOf(job, true) : { ...IDLE, locked: true };
   }
-  await env.CARDS.put(LOCK_KEY, String(Date.now()), { expirationTtl: 120 });
+  const lockedAt = Date.now();
+  await env.CARDS.put(LOCK_KEY, String(lockedAt), { expirationTtl: 120 });
   try {
     let job = await env.CARDS.get<ProfileJob>(JOB_KEY, "json");
     if (restart || !job) job = await freshJob(env);
@@ -119,7 +120,14 @@ export async function stepProfileSync(env: AdminEnv, restart: boolean): Promise<
     await env.CARDS.put(JOB_KEY, JSON.stringify(job));
     return progressOf(job, false);
   } finally {
-    await env.CARDS.delete(LOCK_KEY);
+    // KV allows one write per key per second; fast traders need a gap before delete.
+    const wait = Math.max(0, 1_100 - (Date.now() - lockedAt));
+    if (wait > 0) await new Promise<void>((resolve) => setTimeout(resolve, wait));
+    try {
+      await removeKey(env, LOCK_KEY);
+    } catch {
+      // Lock TTL clears it; don't fail the step on a rate-limited delete.
+    }
   }
 }
 

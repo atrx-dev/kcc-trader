@@ -352,7 +352,7 @@ async function writeKey(env: SyncEnv, key: string, value: string, options?: KVNa
   }
 }
 
-async function removeKey(env: SyncEnv, key: string): Promise<void> {
+export async function removeKey(env: { CARDS: KVNamespace }, key: string): Promise<void> {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
       await env.CARDS.delete(key);

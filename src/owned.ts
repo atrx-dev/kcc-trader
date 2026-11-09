@@ -1,4 +1,4 @@
-import { artUrl } from "./sync.ts";
+import { artUrl, removeKey } from "./sync.ts";
 import { type Card } from "./types.ts";
 
 const ORIGIN = "https://koi-card-collector.com";
@@ -378,7 +378,7 @@ export async function readOwned(env: OwnedEnv, profileId: string, refresh: boole
     };
   }
 
-  await env.CARDS.delete(syncKey);
+  await removeKey(env, syncKey);
   await env.CARDS.put(cacheKey, JSON.stringify(pass.owned));
   return {
     ...withNextSync(pass.owned),
