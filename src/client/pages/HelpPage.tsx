@@ -189,6 +189,10 @@ export function HelpPage({ onOpen }: { onOpen: (page: Page, href: string) => voi
         <PageLink page="privacy" href="/privacy" onOpen={onOpen}>
           privacy policy
         </PageLink>
+        . Site rules are in the{" "}
+        <PageLink page="terms" href="/terms" onOpen={onOpen}>
+          terms of service
+        </PageLink>
         .
       </p>
     </div>

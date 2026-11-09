@@ -10,7 +10,8 @@ import { CardFace } from "./components/cards.tsx";
 import { formatSyncedAt, AdminButton, Brand, NavTabs, AccountMenu, HelpButton, LeaderboardButton, TraderSearch } from "./components/header.tsx";
 import { SearchField, type OwnedControls, FilterBar, CatalogActions } from "./components/controls.tsx";
 import { SettingsSheet } from "./components/SettingsSheet.tsx";
-import { EmptyState, Banner, GridSkeleton, Showcase, StatPill, WelcomeDialog } from "./components/common.tsx";
+import { EmptyState, Banner, GridSkeleton, Showcase, StatPill, LegalDialog, WelcomeDialog } from "./components/common.tsx";
+import { LEGAL_VERSION } from "../legal.ts";
 import { ProfilePage } from "./pages/ProfilePage.tsx";
 import { TradesPage } from "./pages/TradesPage.tsx";
 import { LeaderboardPage } from "./pages/LeaderboardPage.tsx";
@@ -18,6 +19,7 @@ import { ListPage } from "./pages/ListPage.tsx";
 import { AdminPage } from "./pages/AdminPage.tsx";
 import { HelpPage } from "./pages/HelpPage.tsx";
 import { PrivacyPage } from "./pages/PrivacyPage.tsx";
+import { TermsPage } from "./pages/TermsPage.tsx";
 import { FeatureDialog } from "./components/FeatureDialog.tsx";
 import { FEATURES, SEEN_FEATURE_KEY, unseenFeatures } from "./features.ts";
 
@@ -57,6 +59,10 @@ export function App() {
   const [listError, setListError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const [legalOpen, setLegalOpen] = useState(false);
+  const [pendingWelcome, setPendingWelcome] = useState(false);
+  const [legalAccepting, setLegalAccepting] = useState(false);
+  const [legalError, setLegalError] = useState<string | null>(null);
   const [listsReady, setListsReady] = useState(false);
   const [featureNotes, setFeatureNotes] = useState(() => unseenFeatures(window.localStorage.getItem(SEEN_FEATURE_KEY)));
   const [replayFeatures, setReplayFeatures] = useState(false);
@@ -202,6 +208,10 @@ export function App() {
     if (!user) {
       setLists(NO_LISTS);
       setListsReady(true);
+      setLegalOpen(false);
+      setPendingWelcome(false);
+      setLegalError(null);
+      setWelcomeOpen(false);
       return;
     }
     setListsReady(false);
@@ -370,25 +380,70 @@ export function App() {
     setTradeView(next);
   }
 
-  function receiveLists(data: Lists & { welcome?: boolean }) {
-    const { welcome, ...lists } = data;
+  function profileNeedsWelcome() {
+    return Boolean(user && (!user.profile || user.profile.publicCollection === false));
+  }
+
+  function receiveLists(data: Lists & { welcome?: boolean; needsLegal?: boolean }) {
+    const { welcome, needsLegal, ...lists } = data;
     savedLists.current = lists;
     setLists(withChanges(lists, pendingChanges.current));
     if (welcome) {
       const latest = FEATURES.at(-1);
       if (latest) window.localStorage.setItem(SEEN_FEATURE_KEY, latest.id);
       setFeatureNotes([]);
-      setWelcomeOpen(true);
+    }
+    const showWelcome = Boolean(welcome) && profileNeedsWelcome();
+    if (needsLegal) {
+      setLegalError(null);
+      setLegalOpen(true);
+      setPendingWelcome(showWelcome);
+      if (welcome && !showWelcome) markIntroduced();
+      return;
+    }
+    if (showWelcome) setWelcomeOpen(true);
+    else if (welcome) markIntroduced();
+  }
+
+  async function acceptLegal() {
+    if (legalAccepting) return;
+    setLegalAccepting(true);
+    setLegalError(null);
+    try {
+      const response = await fetch("/api/preferences", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ legalVersion: LEGAL_VERSION }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "Could not save your agreement");
+      }
+      setLegalOpen(false);
+      if (pendingWelcome && profileNeedsWelcome()) {
+        setPendingWelcome(false);
+        setWelcomeOpen(true);
+      } else {
+        setPendingWelcome(false);
+      }
+    } catch (cause) {
+      setLegalError(cause instanceof Error ? cause.message : "Could not save your agreement");
+    } finally {
+      setLegalAccepting(false);
     }
   }
 
-  function dismissWelcome() {
-    setWelcomeOpen(false);
+  function markIntroduced() {
     void fetch("/api/preferences", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ introduced: true }),
     });
+  }
+
+  function dismissWelcome() {
+    setWelcomeOpen(false);
+    markIntroduced();
   }
 
   function confirmProfilePublic() {
@@ -761,6 +816,7 @@ export function App() {
     profile: null,
     help: null,
     privacy: null,
+    terms: null,
     leaderboard: null,
     admin: null,
   };
@@ -838,6 +894,7 @@ export function App() {
               signedIn={user !== null}
               onShowFeatures={() => setReplayFeatures(true)}
               onOpenPrivacy={() => openPage("privacy", "/privacy")}
+              onOpenTerms={() => openPage("terms", "/terms")}
               onOpenAdmin={admin ? () => openPage("admin", "/admin") : undefined}
             />
             {userLoaded ? <AccountMenu user={user} privateProfile={needsPublicProfile} onOpen={openPage} /> : null}
@@ -937,7 +994,7 @@ export function App() {
             {notice}
           </Banner>
         ) : null}
-        {needsPublicProfile && !welcomeOpen ? (
+        {needsPublicProfile && !welcomeOpen && !legalOpen ? (
           <Banner tone="info">
             {publicProfileMessage}{" "}
             <button
@@ -949,6 +1006,13 @@ export function App() {
             </button>
           </Banner>
         ) : null}
+        <LegalDialog
+          open={legalOpen && page !== "terms" && page !== "privacy"}
+          accepting={legalAccepting}
+          error={legalError}
+          onAccept={() => void acceptLegal()}
+          onOpenPage={openPage}
+        />
         <WelcomeDialog
           open={welcomeOpen}
           onDismiss={dismissWelcome}
@@ -961,6 +1025,7 @@ export function App() {
             Boolean(user) &&
             listsReady &&
             !welcomeOpen &&
+            !legalOpen &&
             (replayFeatures || (settings.featureNotes && featureNotes.length > 0))
           }
           notes={replayFeatures ? [...FEATURES].reverse() : featureNotes}
@@ -974,6 +1039,8 @@ export function App() {
           <HelpPage onOpen={openPage} />
         ) : page === "privacy" ? (
           <PrivacyPage onOpen={openPage} />
+        ) : page === "terms" ? (
+          <TermsPage onOpen={openPage} />
         ) : page === "leaderboard" ? (
           <LeaderboardPage
             by={leaderboardBy}

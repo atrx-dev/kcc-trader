@@ -6,8 +6,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { cardKey, type Card } from "../../types.ts";
-import { profileUrl } from "../model.ts";
+import { profileUrl, type Page } from "../model.ts";
 import { CardFace } from "./cards.tsx";
+import { PrivacyPage } from "../pages/PrivacyPage.tsx";
+import { TermsPage } from "../pages/TermsPage.tsx";
 
 export function EmptyState({
   icon: Icon,
@@ -64,6 +66,129 @@ export function Banner({
         </button>
       ) : null}
     </div>
+  );
+}
+
+export function LegalDialog({
+  open,
+  accepting,
+  error,
+  onAccept,
+  onOpenPage,
+}: {
+  open: boolean;
+  accepting: boolean;
+  error: string | null;
+  onAccept: () => void;
+  onOpenPage: (page: Page, href: string) => void;
+}) {
+  const [agreed, setAgreed] = useState(false);
+  const [document, setDocument] = useState<"terms" | "privacy" | null>(null);
+  useEffect(() => {
+    if (!open) {
+      setAgreed(false);
+      setDocument(null);
+    }
+  }, [open]);
+
+  return (
+    <>
+      <Dialog.Root open={open}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
+          <Dialog.Content
+            onEscapeKeyDown={(event) => event.preventDefault()}
+            onPointerDownOutside={(event) => event.preventDefault()}
+            className="fixed top-1/2 left-1/2 z-50 w-[min(28rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/10 bg-[#1a1528] p-6 text-white shadow-lg outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
+          >
+            <Dialog.Title className="font-display text-xl font-bold">Before you continue</Dialog.Title>
+            <Dialog.Description className="mt-2 text-sm text-white/70">
+              Please review the{" "}
+              <button
+                type="button"
+                className="font-semibold text-white underline decoration-white/30 underline-offset-2 hover:decoration-white"
+                onClick={() => setDocument("terms")}
+              >
+                terms of service
+              </button>{" "}
+              and{" "}
+              <button
+                type="button"
+                className="font-semibold text-white underline decoration-white/30 underline-offset-2 hover:decoration-white"
+                onClick={() => setDocument("privacy")}
+              >
+                privacy policy
+              </button>
+              . Continuing means you agree to both.
+            </Dialog.Description>
+            <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-3 text-sm text-white/80">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(event) => setAgreed(event.target.checked)}
+                disabled={accepting}
+                className="mt-0.5 size-4 shrink-0 rounded border-white/30 bg-transparent accent-violet-300"
+              />
+              <span>I agree to the terms of service and privacy policy.</span>
+            </label>
+            {error ? <p className="mt-3 text-sm text-rose-300">{error}</p> : null}
+            <div className="mt-5 flex justify-end">
+              <Button className="rounded-full" disabled={!agreed || accepting} onClick={onAccept}>
+                {accepting ? "Saving…" : "Continue"}
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      <Dialog.Root open={document !== null} onOpenChange={(next) => { if (!next) setDocument(null); }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-[70] bg-black/60 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 z-[70] flex max-h-[min(44rem,calc(100%-2rem))] w-[min(40rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#141224] text-white shadow-lg outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
+              <Dialog.Title className="font-display text-lg font-bold">
+                {document === "privacy" ? "Privacy policy" : "Terms of service"}
+              </Dialog.Title>
+              <Dialog.Close asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Close"
+                  className="rounded-full text-white/70 hover:bg-white/10 hover:text-white"
+                >
+                  <X />
+                </Button>
+              </Dialog.Close>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+              {document === "privacy" ? (
+                <PrivacyPage
+                  embedded
+                  onOpen={(page, href) => {
+                    if (page === "terms" || page === "privacy") setDocument(page);
+                    else {
+                      setDocument(null);
+                      onOpenPage(page, href);
+                    }
+                  }}
+                />
+              ) : document === "terms" ? (
+                <TermsPage
+                  embedded
+                  onOpen={(page, href) => {
+                    if (page === "terms" || page === "privacy") setDocument(page);
+                    else {
+                      setDocument(null);
+                      onOpenPage(page, href);
+                    }
+                  }}
+                />
+              ) : null}
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </>
   );
 }
 

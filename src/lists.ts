@@ -59,6 +59,7 @@ export interface TraderRow {
   list_duplicates?: number;
   last_seen_at: number;
   introduced?: number;
+  legal_version?: string | null;
 }
 
 interface EntryRow {
@@ -73,7 +74,7 @@ const MAX_PER_LIST = 400;
 const MAX_CHANGES = 200;
 const SEEN_RESOLUTION = 60 * 60 * 1000;
 export const TRADER_COLUMNS =
-  "traders.id, traders.name, traders.username, traders.avatar_url, traders.kcc_name, traders.kcc_id, traders.accepting, traders.prune_wishlist, traders.list_duplicates, traders.last_seen_at, traders.introduced";
+  "traders.id, traders.name, traders.username, traders.avatar_url, traders.kcc_name, traders.kcc_id, traders.accepting, traders.prune_wishlist, traders.list_duplicates, traders.last_seen_at, traders.introduced, traders.legal_version";
 
 export function parseChanges(value: unknown): ListChange[] | null {
   if (!Array.isArray(value) || value.length === 0 || value.length > MAX_CHANGES) return null;
@@ -335,7 +336,11 @@ function responseFrom(trader: D1Result, entries: D1Result, skips: D1Result, keep
   };
 }
 
-export async function readLists(env: ListEnv, trader: Trader): Promise<ListsResponse & { welcome: boolean }> {
+export async function readLists(
+  env: ListEnv,
+  trader: Trader,
+  legalVersion: string,
+): Promise<ListsResponse & { welcome: boolean; needsLegal: boolean }> {
   const [, row, entries, skips, keeps] = await env.DB.batch([
     saveTrader(env, trader),
     selectTrader(env, trader.id),
@@ -344,11 +349,19 @@ export async function readLists(env: ListEnv, trader: Trader): Promise<ListsResp
     selectKeeps(env, trader.id),
   ]);
   const stored = row.results[0] as TraderRow | undefined;
-  return { ...responseFrom(row, entries, skips, keeps), welcome: stored?.introduced === 0 };
+  return {
+    ...responseFrom(row, entries, skips, keeps),
+    welcome: stored?.introduced === 0,
+    needsLegal: stored?.legal_version !== legalVersion,
+  };
 }
 
 export function markIntroduced(env: ListEnv, traderId: string): Promise<D1Result> {
   return env.DB.prepare("UPDATE traders SET introduced = 1 WHERE id = ?").bind(traderId).run();
+}
+
+export function markLegalAccepted(env: ListEnv, traderId: string, version: string): Promise<D1Result> {
+  return env.DB.prepare("UPDATE traders SET legal_version = ?1 WHERE id = ?2").bind(version, traderId).run();
 }
 
 export async function setPreferences(

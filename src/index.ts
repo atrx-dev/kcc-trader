@@ -3,6 +3,7 @@ import {
   changeLists,
   parseChanges,
   markIntroduced,
+  markLegalAccepted,
   readLists,
   readPublicLists,
   countTraders,
@@ -21,6 +22,7 @@ import {
   type Preferences,
   type Trader,
 } from "./lists.ts";
+import { LEGAL_VERSION } from "./legal.ts";
 import {
   copiesForKeys,
   isSpare,
@@ -288,16 +290,24 @@ export default {
         preferences[name] = value;
       }
       if (body?.introduced === true) await markIntroduced(env, user.id);
+      if (body?.legalVersion !== undefined) {
+        if (body.legalVersion !== LEGAL_VERSION) {
+          return Response.json({ error: "Outdated terms version" }, { status: 400 });
+        }
+        await markLegalAccepted(env, user.id, LEGAL_VERSION);
+      }
       if (Object.keys(preferences).length === 0) {
-        if (body?.introduced !== true) return Response.json({ error: "Invalid preferences" }, { status: 400 });
-        return Response.json(await readLists(env, traderFor(user)));
+        if (body?.introduced !== true && body?.legalVersion === undefined) {
+          return Response.json({ error: "Invalid preferences" }, { status: 400 });
+        }
+        return Response.json(await readLists(env, traderFor(user), LEGAL_VERSION));
       }
       const saved = await setPreferences(env, traderFor(user), preferences);
       if (!(preferences.pruneWishlist || preferences.listDuplicates) || !user.profile) return Response.json(saved);
       const owned = await readOwned(env, user.profile.id, false).catch(() => null);
       const listSync = owned ? await syncOwnedLists(env, user.id, owned, preferences.listDuplicates) : null;
       if (!changedLists(listSync)) return Response.json(saved);
-      return Response.json({ ...(await readLists(env, traderFor(user))), listSync });
+      return Response.json({ ...(await readLists(env, traderFor(user), LEGAL_VERSION)), listSync });
     }
 
     if (url.pathname === "/api/lists") {
@@ -305,7 +315,7 @@ export default {
       if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
       if (request.method === "GET") {
         await snapshotCollection(env, user);
-        return Response.json(await readLists(env, traderFor(user)));
+        return Response.json(await readLists(env, traderFor(user), LEGAL_VERSION));
       }
       if (request.method === "POST") {
         const body = (await request.json().catch(() => null)) as { changes?: unknown } | null;
@@ -326,7 +336,7 @@ export default {
         }
 
         if (accepted.length === 0) {
-          return Response.json({ ...(await readLists(env, traderFor(user))), rejected });
+          return Response.json({ ...(await readLists(env, traderFor(user), LEGAL_VERSION)), rejected });
         }
         const { full, ...lists } = await changeLists(env, traderFor(user), accepted);
         if (full) rejected = "That list is full.";

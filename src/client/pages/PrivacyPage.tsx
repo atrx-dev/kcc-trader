@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Shield } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Page } from "../model.ts";
 
 const SECTIONS = [
@@ -11,21 +12,31 @@ const SECTIONS = [
   { id: "retention", label: "Retention and deletion" },
 ] as const;
 
-export function PrivacyPage({ onOpen }: { onOpen: (page: Page, href: string) => void }) {
+export function PrivacyPage({
+  onOpen,
+  embedded = false,
+}: {
+  onOpen: (page: Page, href: string) => void;
+  embedded?: boolean;
+}) {
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-6">
-      <section className="flex items-center gap-4 rounded-[1.75rem] border border-white/10 bg-[radial-gradient(110%_130%_at_0%_0%,rgba(186,176,255,0.18),transparent_55%),linear-gradient(160deg,#1c1833,#141224)] px-5 py-4 md:px-8 md:py-5">
-        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-violet-200/15 text-violet-200">
-          <Shield className="size-5" />
-        </span>
-        <div className="min-w-0">
-          <h1 className="font-display text-2xl leading-tight font-extrabold tracking-tight md:text-3xl">
-            Privacy policy
-          </h1>
-          <p className="text-sm text-white/65">How KCC Trader handles your account and trading data.</p>
-          <p className="mt-1 text-xs text-white/45">Effective November 9, 2026</p>
-        </div>
-      </section>
+    <div className={cn("mx-auto grid w-full gap-6", embedded ? "max-w-none gap-4" : "max-w-3xl")}>
+      {embedded ? (
+        <p className="text-xs text-white/45">Effective November 9, 2026</p>
+      ) : (
+        <section className="flex items-center gap-4 rounded-[1.75rem] border border-white/10 bg-[radial-gradient(110%_130%_at_0%_0%,rgba(186,176,255,0.18),transparent_55%),linear-gradient(160deg,#1c1833,#141224)] px-5 py-4 md:px-8 md:py-5">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-violet-200/15 text-violet-200">
+            <Shield className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h1 className="font-display text-2xl leading-tight font-extrabold tracking-tight md:text-3xl">
+              Privacy policy
+            </h1>
+            <p className="text-sm text-white/65">How KCC Trader handles your account and trading data.</p>
+            <p className="mt-1 text-xs text-white/45">Effective November 9, 2026</p>
+          </div>
+        </section>
+      )}
 
       <nav aria-label="Privacy sections" className="flex flex-wrap gap-2">
         {SECTIONS.map((section) => (
@@ -109,9 +120,13 @@ export function PrivacyPage({ onOpen }: { onOpen: (page: Page, href: string) => 
           be removed automatically, including their lists and synced collection cache.
         </p>
         <p>
+          When you agree to the terms of service and this privacy policy, we store which version you accepted so we know
+          you have seen the current rules.
+        </p>
+        <p>
           You can delete your account anytime in Settings → Delete account. That removes your trader row, lists, trade
-          preferences, and synced collection cache from KCC Trader, and signs you out. Catalog card data shared by
-          everyone is not personal account data and is not deleted with your account.
+          preferences, agreement record, and synced collection cache from KCC Trader, and signs you out. Catalog card
+          data shared by everyone is not personal account data and is not deleted with your account.
         </p>
         <p>
           Browser local storage is not cleared by account deletion; you can remove it yourself in your browser if you
@@ -120,7 +135,11 @@ export function PrivacyPage({ onOpen }: { onOpen: (page: Page, href: string) => 
       </Article>
 
       <p className="text-sm text-white/55">
-        For how syncing and lists work day to day, see{" "}
+        Site rules are in the{" "}
+        <PageLink page="terms" href="/terms" onOpen={onOpen}>
+          terms of service
+        </PageLink>
+        . For how syncing and lists work day to day, see{" "}
         <PageLink page="help" href="/help" onOpen={onOpen}>
           Help
         </PageLink>
