@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { Award, Crown, Medal, Trophy } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,6 +26,8 @@ const BOARDS: { id: LeaderboardBy; label: string; short?: string }[] = [
 ];
 
 const RANK_TONE = ["text-amber-200", "text-slate-200", "text-orange-300"];
+const ROW_GAP = 8;
+const ROW_ESTIMATE = 80;
 
 function score(entry: LeaderboardEntry, by: LeaderboardBy): number {
   return entry[by];
@@ -34,6 +37,131 @@ function scoreLabel(by: LeaderboardBy): string {
   if (by === "sss") return "SSS";
   if (by === "level") return "level";
   return "value";
+}
+
+const LeaderboardRow = memo(function LeaderboardRow({
+  trader,
+  by,
+  own,
+  onOpenProfile,
+}: {
+  trader: LeaderboardEntry;
+  by: LeaderboardBy;
+  own: boolean;
+  onOpenProfile: (id: string) => void;
+}) {
+  const value = score(trader, by);
+  const RankIcon = trader.rank === 1 ? Crown : trader.rank === 2 ? Medal : trader.rank === 3 ? Award : null;
+  return (
+    <a
+      href={`/u/${trader.id}`}
+      onClick={(event) => {
+        event.preventDefault();
+        onOpenProfile(trader.id);
+      }}
+      className={cn(
+        "flex min-w-0 items-center gap-2 rounded-2xl border py-3 pr-5 pl-2.5 outline-none transition-colors hover:bg-white/[0.04] focus-visible:ring-3 focus-visible:ring-ring/50 sm:gap-3 sm:pr-6 sm:pl-3 md:gap-4 md:pr-7 md:pl-4",
+        own ? "border-amber-200/40 bg-amber-200/[0.06]" : "border-white/10 bg-white/[0.03]",
+      )}
+    >
+      <span
+        className={cn(
+          "grid w-8 shrink-0 place-items-center font-display text-lg font-extrabold tabular-nums sm:w-10",
+          RANK_TONE[trader.rank - 1] ?? "text-white/45",
+        )}
+      >
+        {RankIcon ? <RankIcon className="size-5" aria-hidden="true" /> : trader.rank}
+        <span className="sr-only">Rank {trader.rank}</span>
+      </span>
+      <Avatar className="size-9 sm:size-11">
+        <AvatarImage src={trader.avatarUrl} alt="" loading="lazy" decoding="async" />
+        <AvatarFallback>{trader.name.slice(0, 1)}</AvatarFallback>
+      </Avatar>
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="min-w-0 truncate font-semibold">{trader.name}</span>
+          {own ? (
+            <span className="rounded-full bg-amber-200/15 px-2 py-0.5 text-[0.7rem] font-semibold text-amber-100">
+              You
+            </span>
+          ) : null}
+        </span>
+        <span className="block truncate text-sm text-white/55">
+          @{trader.username}
+          {trader.kccName ? ` · ${trader.kccName}` : ""}
+          {by === "sss" ? ` · Level ${trader.level.toLocaleString()}` : ` · ${trader.sss.toLocaleString()} SSS`}
+        </span>
+      </span>
+      <span className="shrink-0 text-right">
+        <span className="block font-display text-lg leading-none font-extrabold tabular-nums sm:text-xl">
+          {value.toLocaleString()}
+        </span>
+        <span className="mt-1 block text-xs text-white/55">{scoreLabel(by)}</span>
+      </span>
+    </a>
+  );
+});
+
+function LeaderboardList({
+  traders,
+  by,
+  userId,
+  onOpenProfile,
+}: {
+  traders: LeaderboardEntry[];
+  by: LeaderboardBy;
+  userId: string | null;
+  onOpenProfile: (id: string) => void;
+}) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  const virtualizer = useWindowVirtualizer({
+    count: traders.length,
+    estimateSize: () => ROW_ESTIMATE,
+    overscan: 6,
+    gap: ROW_GAP,
+    scrollMargin,
+    getItemKey: (index) => traders[index]!.id,
+    measureElement: (element) => (element as HTMLElement).offsetHeight,
+    directDomUpdates: true,
+    useCachedMeasurements: true,
+    useFlushSync: false,
+  });
+
+  useLayoutEffect(() => {
+    const node = frameRef.current;
+    if (!node) return;
+    const apply = () => {
+      const nextMargin = node.getBoundingClientRect().top + window.scrollY;
+      setScrollMargin((current) => (Math.abs(current - nextMargin) < 0.5 ? current : nextMargin));
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
+  }, [traders.length, by]);
+
+  const rows = virtualizer.getVirtualItems();
+
+  return (
+    <div ref={frameRef} className="virtual-grid min-w-0" data-scrolling={virtualizer.isScrolling ? "" : undefined}>
+      <ol ref={virtualizer.containerRef} className="relative m-0 list-none p-0">
+        {rows.map((row) => {
+          const trader = traders[row.index]!;
+          return (
+            <li
+              key={row.key}
+              data-index={row.index}
+              ref={virtualizer.measureElement}
+              className="absolute top-0 left-0 w-full min-w-0"
+              style={{ transform: `translate3d(0, ${row.start - scrollMargin}px, 0)` }}
+            >
+              <LeaderboardRow trader={trader} by={by} own={trader.id === userId} onOpenProfile={onOpenProfile} />
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
 }
 
 export function LeaderboardPage({
@@ -54,6 +182,7 @@ export function LeaderboardPage({
 
   useEffect(() => {
     const controller = new AbortController();
+    setState((current) => ({ status: "loading", traders: current.traders }));
     fetch(`/api/leaderboard?by=${by}`, { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error("Could not load the leaderboard");
@@ -118,7 +247,7 @@ export function LeaderboardPage({
         })}
       </div>
 
-      {state.status === "loading" ? (
+      {state.status === "loading" && state.traders.length === 0 ? (
         <div className="grid gap-2">
           {Array.from({ length: 6 }, (_, index) => (
             <Skeleton key={index} className="h-[72px] rounded-2xl bg-white/[0.05]" />
@@ -128,68 +257,12 @@ export function LeaderboardPage({
         <EmptyState icon={Trophy} title="Couldn't load the leaderboard">
           Something went wrong. Try again in a moment.
         </EmptyState>
-      ) : state.traders.length === 0 ? (
+      ) : state.status === "ready" && state.traders.length === 0 ? (
         <EmptyState icon={Trophy} title="No collections on the board yet">
           A trader shows up here after they visit with a public KCC collection.
         </EmptyState>
       ) : (
-        <ol className="grid gap-2">
-          {state.traders.map((trader) => {
-            const value = score(trader, by);
-            const own = trader.id === userId;
-            const RankIcon = trader.rank === 1 ? Crown : trader.rank === 2 ? Medal : trader.rank === 3 ? Award : null;
-            return (
-              <li key={trader.id} className="min-w-0">
-                <a
-                  href={`/u/${trader.id}`}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    onOpenProfile(trader.id);
-                  }}
-                  className={cn(
-                    "flex min-w-0 items-center gap-2 rounded-2xl border py-3 pr-5 pl-2.5 outline-none transition-colors hover:bg-white/[0.04] focus-visible:ring-3 focus-visible:ring-ring/50 sm:gap-3 sm:pr-6 sm:pl-3 md:gap-4 md:pr-7 md:pl-4",
-                    own ? "border-amber-200/40 bg-amber-200/[0.06]" : "border-white/10 bg-white/[0.03]",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "grid w-8 shrink-0 place-items-center font-display text-lg font-extrabold tabular-nums sm:w-10",
-                      RANK_TONE[trader.rank - 1] ?? "text-white/45",
-                    )}
-                  >
-                    {RankIcon ? <RankIcon className="size-5" aria-hidden="true" /> : trader.rank}
-                    <span className="sr-only">Rank {trader.rank}</span>
-                  </span>
-                  <Avatar className="size-9 sm:size-11">
-                    <AvatarImage src={trader.avatarUrl} alt="" />
-                    <AvatarFallback>{trader.name.slice(0, 1)}</AvatarFallback>
-                  </Avatar>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                      <span className="min-w-0 truncate font-semibold">{trader.name}</span>
-                      {own ? (
-                        <span className="rounded-full bg-amber-200/15 px-2 py-0.5 text-[0.7rem] font-semibold text-amber-100">
-                          You
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="block truncate text-sm text-white/55">
-                      @{trader.username}
-                      {trader.kccName ? ` · ${trader.kccName}` : ""}
-                      {by === "sss" ? ` · Level ${trader.level.toLocaleString()}` : ` · ${trader.sss.toLocaleString()} SSS`}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-right">
-                    <span className="block font-display text-lg leading-none font-extrabold tabular-nums sm:text-xl">
-                      {value.toLocaleString()}
-                    </span>
-                    <span className="mt-1 block text-xs text-white/55">{scoreLabel(by)}</span>
-                  </span>
-                </a>
-              </li>
-            );
-          })}
-        </ol>
+        <LeaderboardList traders={state.traders} by={by} userId={userId} onOpenProfile={onOpenProfile} />
       )}
     </>
   );
