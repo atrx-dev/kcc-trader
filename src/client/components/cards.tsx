@@ -187,6 +187,7 @@ export function CardFace({
   priority = false,
   wanted = 0,
   lazy = false,
+  effects = true,
   onPriority,
 }: {
   card: Card;
@@ -195,9 +196,10 @@ export function CardFace({
   priority?: boolean;
   wanted?: number;
   lazy?: boolean;
+  effects?: boolean;
   onPriority?: () => void;
 }) {
-  const holo = card.rank === "S" || card.rank === "SS" || card.rank === "SSS";
+  const holo = effects && (card.rank === "S" || card.rank === "SS" || card.rank === "SSS");
   const fresh = isNewCard(card);
   const framed = hasFrame(card);
   const face = (

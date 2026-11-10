@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { memo, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { ArrowLeftRight, ExternalLink, Handshake, Heart, LogIn, RotateCcw, SearchX } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,6 +11,8 @@ import { CardFace } from "../components/cards.tsx";
 import { EmptyState } from "../components/common.tsx";
 
 const MATCH_GAP = 16;
+const MATCH_PREVIEW_DESKTOP = 8;
+const MATCH_PREVIEW_MOBILE = 4;
 
 export interface ResolvedMatch {
   trader: Trader;
@@ -20,16 +22,21 @@ export interface ResolvedMatch {
   theyHaveCopies?: Record<string, number>;
 }
 
-export const MATCH_PREVIEW = 8;
+export const MATCH_PREVIEW = MATCH_PREVIEW_DESKTOP;
 
-export function MatchCards({
+function isMobileTradesLayout(): boolean {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+}
+
+export const MatchCards = memo(function MatchCards({
   title,
   cards,
   tone,
   owned,
   ownedMarks,
   priority,
-  copiesFor,
+  theyHaveCopies,
+  previewCount,
 }: {
   title: string;
   cards: Card[];
@@ -37,10 +44,11 @@ export function MatchCards({
   owned: OwnedState;
   ownedMarks: boolean;
   priority: Set<string>;
-  copiesFor?: (card: Card) => number;
+  theyHaveCopies?: Record<string, number>;
+  previewCount: number;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const shown = expanded ? cards : cards.slice(0, MATCH_PREVIEW);
+  const shown = expanded ? cards : cards.slice(0, previewCount);
   return (
     <div className="grid min-w-0 content-start gap-3 rounded-[14px] border border-white/[0.06] bg-white/[0.03] p-4">
       <p className="flex min-w-0 items-center justify-between gap-2 text-sm font-semibold">
@@ -55,15 +63,16 @@ export function MatchCards({
           <div key={cardKey(card)} className="trade-thumb min-w-0">
             <CardFace
               card={card}
-              copies={copiesFor ? copiesFor(card) : duplicateCount(card, owned)}
+              copies={theyHaveCopies ? listedCopies(card, theyHaveCopies) : duplicateCount(card, owned)}
               owned={ownedMarks && isOwned(card, owned)}
               priority={priority.has(cardKey(card))}
               lazy
+              effects={false}
             />
           </div>
         ))}
       </div>
-      {cards.length > MATCH_PREVIEW ? (
+      {cards.length > previewCount ? (
         <Button
           variant="ghost"
           size="sm"
@@ -75,17 +84,19 @@ export function MatchCards({
       ) : null}
     </div>
   );
-}
+});
 
-export function TraderMatch({
+export const TraderMatch = memo(function TraderMatch({
   match,
   owned,
   ownedMarks,
+  previewCount,
   onOpen,
 }: {
   match: ResolvedMatch;
   owned: OwnedState;
   ownedMarks: boolean;
+  previewCount: number;
   onOpen: (page: Page, href: string) => void;
 }) {
   const { trader, theyHave, theyWant, priority, theyHaveCopies } = match;
@@ -134,16 +145,25 @@ export function TraderMatch({
             owned={owned}
             ownedMarks={ownedMarks}
             priority={priority}
-            copiesFor={(card) => listedCopies(card, theyHaveCopies)}
+            theyHaveCopies={theyHaveCopies}
+            previewCount={previewCount}
           />
         ) : null}
         {theyWant.length > 0 ? (
-          <MatchCards title="You have, they want" cards={theyWant} tone="bg-sky-300" owned={owned} ownedMarks={false} priority={priority} />
+          <MatchCards
+            title="You have, they want"
+            cards={theyWant}
+            tone="bg-sky-300"
+            owned={owned}
+            ownedMarks={false}
+            priority={priority}
+            previewCount={previewCount}
+          />
         ) : null}
       </div>
     </article>
   );
-}
+});
 
 const VIEWS: { id: TradeView; label: string; icon: typeof Handshake; tone: string; blurb: string }[] = [
   {
@@ -205,17 +225,16 @@ function compareView(view: TradeView) {
   };
 }
 
-function estimateMatchSize(match: ResolvedMatch): number {
+function estimateMatchSize(match: ResolvedMatch, previewCount: number, stacked: boolean): number {
   const hasHave = match.theyHave.length > 0;
   const hasWant = match.theyWant.length > 0;
   const preview = Math.max(
-    hasHave ? Math.min(match.theyHave.length, MATCH_PREVIEW) : 0,
-    hasWant ? Math.min(match.theyWant.length, MATCH_PREVIEW) : 0,
+    hasHave ? Math.min(match.theyHave.length, previewCount) : 0,
+    hasWant ? Math.min(match.theyWant.length, previewCount) : 0,
     1,
   );
   const rows = Math.ceil(preview / 3);
   const panel = 88 + rows * 148;
-  const stacked = typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
   const panels = (hasHave ? 1 : 0) + (hasWant ? 1 : 0);
   return 150 + (stacked && panels > 1 ? panels * panel : panel);
 }
@@ -233,11 +252,19 @@ function MatchList({
 }) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
+  const layout = useMemo(() => {
+    const mobile = isMobileTradesLayout();
+    return {
+      previewCount: mobile ? MATCH_PREVIEW_MOBILE : MATCH_PREVIEW_DESKTOP,
+      stacked: mobile,
+      overscan: mobile ? 1 : 3,
+    };
+  }, []);
   const listKey = matches.map((match) => match.trader.id).join("\0");
   const virtualizer = useWindowVirtualizer({
     count: matches.length,
-    estimateSize: (index) => estimateMatchSize(matches[index]!),
-    overscan: 3,
+    estimateSize: (index) => estimateMatchSize(matches[index]!, layout.previewCount, layout.stacked),
+    overscan: layout.overscan,
     gap: MATCH_GAP,
     scrollMargin,
     getItemKey: (index) => matches[index]!.trader.id,
@@ -279,7 +306,13 @@ function MatchList({
               ref={virtualizer.measureElement}
               style={{ marginBottom: order === rows.length - 1 ? 0 : MATCH_GAP }}
             >
-              <TraderMatch match={match} owned={owned} ownedMarks={ownedMarks} onOpen={onOpen} />
+              <TraderMatch
+                match={match}
+                owned={owned}
+                ownedMarks={ownedMarks}
+                previewCount={layout.previewCount}
+                onOpen={onOpen}
+              />
             </div>
           );
         })}
@@ -319,14 +352,20 @@ export function TradesPage({
   view: TradeView;
   onView: (view: TradeView) => void;
 }) {
-  const counts: Record<TradeView, number> = { matches: 0, "you-want": 0, "they-want": 0 };
-  for (const match of matches) {
-    if (inView(match, "matches")) counts.matches += 1;
-    else if (inView(match, "you-want")) counts["you-want"] += 1;
-    else if (inView(match, "they-want")) counts["they-want"] += 1;
-  }
-  const shown = matches.filter((match) => inView(match, view));
-  if (view !== "matches") shown.sort(compareView(view));
+  const counts = useMemo(() => {
+    const next: Record<TradeView, number> = { matches: 0, "you-want": 0, "they-want": 0 };
+    for (const match of matches) {
+      if (inView(match, "matches")) next.matches += 1;
+      else if (inView(match, "you-want")) next["you-want"] += 1;
+      else if (inView(match, "they-want")) next["they-want"] += 1;
+    }
+    return next;
+  }, [matches]);
+  const shown = useMemo(() => {
+    const next = matches.filter((match) => inView(match, view));
+    if (view !== "matches") next.sort(compareView(view));
+    return next;
+  }, [matches, view]);
   const blurb = VIEWS.find((item) => item.id === view)?.blurb ?? "";
   const ready = Boolean(user) && !loading && !failed && !needsBothLists;
 
