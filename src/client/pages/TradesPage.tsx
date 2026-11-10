@@ -13,6 +13,8 @@ import { EmptyState } from "../components/common.tsx";
 const MATCH_GAP = 16;
 const MATCH_PREVIEW_DESKTOP = 8;
 const MATCH_PREVIEW_MOBILE = 8;
+/** Temporary: set false to test whether frame overlays are the mobile scroll bottleneck. */
+const TRADE_THUMB_FRAMES = false;
 
 export interface ResolvedMatch {
   trader: Trader;
@@ -68,6 +70,7 @@ export const MatchCards = memo(function MatchCards({
               priority={priority.has(cardKey(card))}
               lazy
               effects={false}
+              showFrame={TRADE_THUMB_FRAMES}
             />
           </div>
         ))}
