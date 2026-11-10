@@ -188,7 +188,7 @@ export function CardFace({
   wanted = 0,
   lazy = false,
   effects = true,
-  holdMedia = false,
+  mediaDelay = 0,
   onPriority,
 }: {
   card: Card;
@@ -198,16 +198,22 @@ export function CardFace({
   wanted?: number;
   lazy?: boolean;
   effects?: boolean;
-  holdMedia?: boolean;
+  mediaDelay?: number;
   onPriority?: () => void;
 }) {
   const holo = effects && (card.rank === "S" || card.rank === "SS" || card.rank === "SSS");
   const fresh = isNewCard(card);
   const framed = hasFrame(card);
-  const [mediaReady, setMediaReady] = useState(!holdMedia);
+  const [mediaReady, setMediaReady] = useState(mediaDelay <= 0);
   useEffect(() => {
-    if (!holdMedia) setMediaReady(true);
-  }, [holdMedia]);
+    if (mediaDelay <= 0) {
+      setMediaReady(true);
+      return;
+    }
+    setMediaReady(false);
+    const timer = window.setTimeout(() => setMediaReady(true), mediaDelay);
+    return () => window.clearTimeout(timer);
+  }, [mediaDelay]);
   const showMedia = mediaReady;
   const face = (
     <div

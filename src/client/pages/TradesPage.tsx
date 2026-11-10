@@ -13,6 +13,7 @@ import { EmptyState } from "../components/common.tsx";
 const MATCH_GAP = 16;
 const MATCH_PREVIEW_DESKTOP = 8;
 const MATCH_PREVIEW_MOBILE = 8;
+const TRADE_MEDIA_STAGGER_MS = 45;
 
 export interface ResolvedMatch {
   trader: Trader;
@@ -37,7 +38,6 @@ export const MatchCards = memo(function MatchCards({
   priority,
   theyHaveCopies,
   previewCount,
-  holdMedia = false,
 }: {
   title: string;
   cards: Card[];
@@ -47,7 +47,6 @@ export const MatchCards = memo(function MatchCards({
   priority: Set<string>;
   theyHaveCopies?: Record<string, number>;
   previewCount: number;
-  holdMedia?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? cards : cards.slice(0, previewCount);
@@ -61,7 +60,7 @@ export const MatchCards = memo(function MatchCards({
         <span className="shrink-0 rounded-full bg-white/[0.08] px-2 py-0.5 text-xs text-white/70 tabular-nums">{cards.length}</span>
       </p>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(min(92px,100%),1fr))] gap-2">
-        {shown.map((card) => (
+        {shown.map((card, index) => (
           <div key={cardKey(card)} className="trade-thumb min-w-0">
             <CardFace
               card={card}
@@ -70,7 +69,7 @@ export const MatchCards = memo(function MatchCards({
               priority={priority.has(cardKey(card))}
               lazy
               effects={false}
-              holdMedia={holdMedia}
+              mediaDelay={index * TRADE_MEDIA_STAGGER_MS}
             />
           </div>
         ))}
@@ -94,14 +93,12 @@ export const TraderMatch = memo(function TraderMatch({
   owned,
   ownedMarks,
   previewCount,
-  holdMedia = false,
   onOpen,
 }: {
   match: ResolvedMatch;
   owned: OwnedState;
   ownedMarks: boolean;
   previewCount: number;
-  holdMedia?: boolean;
   onOpen: (page: Page, href: string) => void;
 }) {
   const { trader, theyHave, theyWant, priority, theyHaveCopies } = match;
@@ -152,7 +149,6 @@ export const TraderMatch = memo(function TraderMatch({
             priority={priority}
             theyHaveCopies={theyHaveCopies}
             previewCount={previewCount}
-            holdMedia={holdMedia}
           />
         ) : null}
         {theyWant.length > 0 ? (
@@ -164,7 +160,6 @@ export const TraderMatch = memo(function TraderMatch({
             ownedMarks={false}
             priority={priority}
             previewCount={previewCount}
-            holdMedia={holdMedia}
           />
         ) : null}
       </div>
@@ -323,7 +318,6 @@ function MatchList({
                   owned={owned}
                   ownedMarks={ownedMarks}
                   previewCount={layout.previewCount}
-                  holdMedia={scrolling}
                   onOpen={onOpen}
                 />
               </div>
@@ -346,7 +340,6 @@ function MatchList({
                   owned={owned}
                   ownedMarks={ownedMarks}
                   previewCount={layout.previewCount}
-                  holdMedia={scrolling}
                   onOpen={onOpen}
                 />
               </div>
