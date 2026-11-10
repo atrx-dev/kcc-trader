@@ -214,7 +214,14 @@ export function CardFace({
       aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${fresh ? ", new" : ""}${priority ? ", priority" : ""}${copies > 1 ? `, ${copies} copies` : owned ? ", owned" : ""}${wanted > 0 ? `, wishlisted by ${wanted}` : ""}`}
     >
       {card.image ? (
-        <img className="card-artwork" src={card.image} alt="" decoding="async" loading={lazy ? "lazy" : undefined} />
+        <img
+          className="card-artwork"
+          src={card.image}
+          alt=""
+          decoding="async"
+          loading={lazy ? "lazy" : undefined}
+          fetchPriority={lazy ? "low" : undefined}
+        />
       ) : (
         <div className="art-fallback" />
       )}

@@ -274,18 +274,15 @@ function MatchList({
   useLayoutEffect(() => {
     const node = frameRef.current;
     if (!node) return;
+    // Don't ResizeObserver this node: padding-based virtualization changes its
+    // height and would feedback into scrollMargin updates while scrolling.
     const apply = () => {
       const nextMargin = node.getBoundingClientRect().top + window.scrollY;
       setScrollMargin((current) => (Math.abs(current - nextMargin) < 0.5 ? current : nextMargin));
     };
     apply();
-    const observer = new ResizeObserver(apply);
-    observer.observe(node);
     window.addEventListener("resize", apply);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", apply);
-    };
+    return () => window.removeEventListener("resize", apply);
   }, [listKey]);
 
   const rows = virtualizer.getVirtualItems();
