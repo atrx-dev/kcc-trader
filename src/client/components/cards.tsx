@@ -188,7 +188,6 @@ export function CardFace({
   wanted = 0,
   lazy = false,
   effects = true,
-  showFrame = true,
   onPriority,
 }: {
   card: Card;
@@ -198,12 +197,11 @@ export function CardFace({
   wanted?: number;
   lazy?: boolean;
   effects?: boolean;
-  showFrame?: boolean;
   onPriority?: () => void;
 }) {
   const holo = effects && (card.rank === "S" || card.rank === "SS" || card.rank === "SSS");
   const fresh = isNewCard(card);
-  const framed = showFrame && hasFrame(card);
+  const framed = hasFrame(card);
   const face = (
     <div
       className={cn(
