@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Check, RefreshCw, RotateCcw, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -342,7 +342,7 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [owned.nextSyncAt]);
 
-  function openPage(next: Page, href: string) {
+  const openPage = useCallback((next: Page, href: string) => {
     if (window.location.pathname !== href) {
       window.history.replaceState(
         window.history.state,
@@ -363,7 +363,7 @@ export function App() {
     setListError(null);
     setNotice(null);
     window.scrollTo({ top: 0 });
-  }
+  }, [query, currentFilters, page, catalogSort, settings.catalogSort, pageFilters]);
 
   function openLeaderboard(next: LeaderboardBy) {
     const href = leaderboardHref(next);

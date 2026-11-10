@@ -45,16 +45,11 @@ const NAME_PLATE_INSET: Record<string, number> = {
   emerald: 280,
 };
 
-function isPngBorder(border: string): boolean {
-  return border.startsWith("halloween-") || isStandardShineBorder(border);
-}
-
 function framePath(card: Card): string {
   if (card.rank !== "SSS") return RANK_FRAMES[card.rank] ?? RANK_FRAMES.Common;
   const border = card.border || "starry";
   if (border === "starry") return "/frames/sss.webp";
-  const extension = isPngBorder(border) ? "png" : "webp";
-  return `/frames/sss-${border}.${extension}`;
+  return `/frames/sss-${border}.webp`;
 }
 
 export function frameUrl(card: Card): string {

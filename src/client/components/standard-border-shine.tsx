@@ -140,7 +140,7 @@ function loadMask(border: StandardShineBorder): Promise<HTMLCanvasElement> {
       }
     };
     image.onerror = () => reject(new Error("Border image could not load"));
-    image.src = `/frames/sss-${border}.png`;
+    image.src = `/frames/sss-${border}.webp`;
   });
   maskCache.set(border, next);
   next.catch(() => maskCache.delete(border));

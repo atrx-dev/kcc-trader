@@ -12,7 +12,7 @@ import { EmptyState } from "../components/common.tsx";
 
 const MATCH_GAP = 16;
 const MATCH_PREVIEW_DESKTOP = 8;
-const MATCH_PREVIEW_MOBILE = 4;
+const MATCH_PREVIEW_MOBILE = 8;
 
 export interface ResolvedMatch {
   trader: Trader;
@@ -269,6 +269,9 @@ function MatchList({
     scrollMargin,
     getItemKey: (index) => matches[index]!.trader.id,
     measureElement: (element) => (element as HTMLElement).offsetHeight,
+    directDomUpdates: true,
+    useCachedMeasurements: true,
+    useFlushSync: false,
   });
 
   useLayoutEffect(() => {
@@ -289,22 +292,19 @@ function MatchList({
   }, [listKey]);
 
   const rows = virtualizer.getVirtualItems();
-  const first = rows[0];
-  const last = rows[rows.length - 1];
-  const paddingTop = first ? Math.max(0, first.start - scrollMargin) : 0;
-  const paddingBottom = last ? Math.max(0, virtualizer.getTotalSize() - (last.end - scrollMargin)) : 0;
 
   return (
-    <div ref={frameRef} className="virtual-grid min-w-0" data-scrolling={virtualizer.isScrolling ? "" : undefined}>
-      <div key={listKey} className="w-full" style={{ paddingTop, paddingBottom }}>
-        {rows.map((row, order) => {
+    <div ref={frameRef} className="virtual-grid min-w-0">
+      <div key={listKey} ref={virtualizer.containerRef} className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+        {rows.map((row) => {
           const match = matches[row.index]!;
           return (
             <div
               key={row.key}
               data-index={row.index}
               ref={virtualizer.measureElement}
-              style={{ marginBottom: order === rows.length - 1 ? 0 : MATCH_GAP }}
+              className="absolute top-0 left-0 w-full"
+              style={{ top: row.start - scrollMargin }}
             >
               <TraderMatch
                 match={match}
