@@ -1,4 +1,4 @@
-import { type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Check, Copy, Heart, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isNewCard, type Card } from "../../types.ts";
@@ -188,6 +188,7 @@ export function CardFace({
   wanted = 0,
   lazy = false,
   effects = true,
+  holdMedia = false,
   onPriority,
 }: {
   card: Card;
@@ -197,11 +198,17 @@ export function CardFace({
   wanted?: number;
   lazy?: boolean;
   effects?: boolean;
+  holdMedia?: boolean;
   onPriority?: () => void;
 }) {
   const holo = effects && (card.rank === "S" || card.rank === "SS" || card.rank === "SSS");
   const fresh = isNewCard(card);
   const framed = hasFrame(card);
+  const [mediaReady, setMediaReady] = useState(!holdMedia);
+  useEffect(() => {
+    if (!holdMedia) setMediaReady(true);
+  }, [holdMedia]);
+  const showMedia = mediaReady;
   const face = (
     <div
       className={cn(
@@ -213,7 +220,7 @@ export function CardFace({
       data-sss-border={card.rank === "SSS" && framed ? card.border || "starry" : undefined}
       aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${fresh ? ", new" : ""}${priority ? ", priority" : ""}${copies > 1 ? `, ${copies} copies` : owned ? ", owned" : ""}${wanted > 0 ? `, wishlisted by ${wanted}` : ""}`}
     >
-      {card.image ? (
+      {card.image && showMedia ? (
         <img
           className="card-artwork"
           src={card.image}
@@ -225,7 +232,9 @@ export function CardFace({
       ) : (
         <div className="art-fallback" />
       )}
-      {framed ? <img className="card-border" src={frameUrl(card)} alt="" decoding="async" loading={lazy ? "lazy" : undefined} /> : null}
+      {framed && showMedia ? (
+        <img className="card-border" src={frameUrl(card)} alt="" decoding="async" loading={lazy ? "lazy" : undefined} />
+      ) : null}
       {framed ? (
         <footer style={namePlateStyle(card)}>
           <strong title={card.variantName ? `${card.name} (${card.variantName})` : card.name}>{card.name}</strong>

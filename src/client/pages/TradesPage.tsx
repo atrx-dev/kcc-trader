@@ -37,6 +37,7 @@ export const MatchCards = memo(function MatchCards({
   priority,
   theyHaveCopies,
   previewCount,
+  holdMedia = false,
 }: {
   title: string;
   cards: Card[];
@@ -46,6 +47,7 @@ export const MatchCards = memo(function MatchCards({
   priority: Set<string>;
   theyHaveCopies?: Record<string, number>;
   previewCount: number;
+  holdMedia?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? cards : cards.slice(0, previewCount);
@@ -68,6 +70,7 @@ export const MatchCards = memo(function MatchCards({
               priority={priority.has(cardKey(card))}
               lazy
               effects={false}
+              holdMedia={holdMedia}
             />
           </div>
         ))}
@@ -91,19 +94,21 @@ export const TraderMatch = memo(function TraderMatch({
   owned,
   ownedMarks,
   previewCount,
+  holdMedia = false,
   onOpen,
 }: {
   match: ResolvedMatch;
   owned: OwnedState;
   ownedMarks: boolean;
   previewCount: number;
+  holdMedia?: boolean;
   onOpen: (page: Page, href: string) => void;
 }) {
   const { trader, theyHave, theyWant, priority, theyHaveCopies } = match;
   const tradeUrl = kccTradeUrl(trader);
 
   return (
-    <article className="grid min-w-0 gap-4 rounded-3xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
+    <article className="trade-match grid min-w-0 gap-4 rounded-3xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
       <header className="grid min-w-0 gap-3 md:flex md:items-center">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Avatar className="size-11 shrink-0">
@@ -147,6 +152,7 @@ export const TraderMatch = memo(function TraderMatch({
             priority={priority}
             theyHaveCopies={theyHaveCopies}
             previewCount={previewCount}
+            holdMedia={holdMedia}
           />
         ) : null}
         {theyWant.length > 0 ? (
@@ -158,6 +164,7 @@ export const TraderMatch = memo(function TraderMatch({
             ownedMarks={false}
             priority={priority}
             previewCount={previewCount}
+            holdMedia={holdMedia}
           />
         ) : null}
       </div>
@@ -258,6 +265,8 @@ function MatchList({
       previewCount: mobile ? MATCH_PREVIEW_MOBILE : MATCH_PREVIEW_DESKTOP,
       stacked: mobile,
       overscan: mobile ? 1 : 3,
+      // Mobile has no hover zoom, so transform positioning is safe and cheaper.
+      transformRows: mobile,
     };
   }, []);
   const listKey = matches.map((match) => match.trader.id).join("\0");
@@ -269,6 +278,9 @@ function MatchList({
     scrollMargin,
     getItemKey: (index) => matches[index]!.trader.id,
     measureElement: (element) => (element as HTMLElement).offsetHeight,
+    directDomUpdates: layout.transformRows,
+    useCachedMeasurements: true,
+    useFlushSync: false,
   });
 
   useLayoutEffect(() => {
@@ -286,34 +298,62 @@ function MatchList({
   }, [listKey]);
 
   const rows = virtualizer.getVirtualItems();
+  const scrolling = virtualizer.isScrolling;
   const first = rows[0];
   const last = rows[rows.length - 1];
   const paddingTop = first ? Math.max(0, first.start - scrollMargin) : 0;
   const paddingBottom = last ? Math.max(0, virtualizer.getTotalSize() - (last.end - scrollMargin)) : 0;
 
   return (
-    <div ref={frameRef} className="virtual-grid min-w-0" data-scrolling={virtualizer.isScrolling ? "" : undefined}>
-      <div key={listKey} className="w-full" style={{ paddingTop, paddingBottom }}>
-        {rows.map((row, order) => {
-          const match = matches[row.index]!;
-          return (
-            <div
-              key={row.key}
-              data-index={row.index}
-              ref={virtualizer.measureElement}
-              style={{ marginBottom: order === rows.length - 1 ? 0 : MATCH_GAP }}
-            >
-              <TraderMatch
-                match={match}
-                owned={owned}
-                ownedMarks={ownedMarks}
-                previewCount={layout.previewCount}
-                onOpen={onOpen}
-              />
-            </div>
-          );
-        })}
-      </div>
+    <div ref={frameRef} className="virtual-grid min-w-0" data-scrolling={scrolling ? "" : undefined}>
+      {layout.transformRows ? (
+        <div key={listKey} ref={virtualizer.containerRef}>
+          {rows.map((row) => {
+            const match = matches[row.index]!;
+            return (
+              <div
+                key={row.key}
+                data-index={row.index}
+                ref={virtualizer.measureElement}
+                className="absolute top-0 left-0 w-full"
+                style={{ transform: `translate3d(0, ${row.start - scrollMargin}px, 0)` }}
+              >
+                <TraderMatch
+                  match={match}
+                  owned={owned}
+                  ownedMarks={ownedMarks}
+                  previewCount={layout.previewCount}
+                  holdMedia={scrolling}
+                  onOpen={onOpen}
+                />
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div key={listKey} className="w-full" style={{ paddingTop, paddingBottom }}>
+          {rows.map((row, order) => {
+            const match = matches[row.index]!;
+            return (
+              <div
+                key={row.key}
+                data-index={row.index}
+                ref={virtualizer.measureElement}
+                style={{ marginBottom: order === rows.length - 1 ? 0 : MATCH_GAP }}
+              >
+                <TraderMatch
+                  match={match}
+                  owned={owned}
+                  ownedMarks={ownedMarks}
+                  previewCount={layout.previewCount}
+                  holdMedia={scrolling}
+                  onOpen={onOpen}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

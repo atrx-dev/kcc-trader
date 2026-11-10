@@ -93,6 +93,13 @@
   }
 }
 
+@media (hover: none), (pointer: coarse) {
+  .trade-match,
+  .trade-thumb {
+    contain: layout paint style;
+  }
+}
+
 .duplicate-mark .duplicate-long,
 .owned-mark .owned-label {
   display: none;
