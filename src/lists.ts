@@ -41,7 +41,7 @@ export interface ListSync {
   added: string[];
 }
 
-export interface ListsResponse extends Lists, Preferences {}
+export interface ListsResponse extends Lists, Preferences { }
 
 export interface ListEnv {
   DB: D1Database;
@@ -70,7 +70,7 @@ interface EntryRow {
 }
 
 const KEY_PATTERN = /^[0-9a-f-]{36}:(?:[0-9a-f-]{36})?:(?:Common|B|A|S|SS|SSS)$/i;
-const MAX_PER_LIST = 400;
+const MAX_PER_LIST = 1_000_000; // 400;
 const MAX_CHANGES = 200;
 const SEEN_RESOLUTION = 60 * 60 * 1000;
 export const TRADER_COLUMNS =
