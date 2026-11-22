@@ -54,3 +54,7 @@ Or connect the GitHub repo to Workers Builds with:
 - Deploy command: `npx wrangler deploy`
 
 Set the same secrets on the Worker as in `.dev.vars`. Cron triggers in `wrangler.jsonc` drive catalog/profile maintenance.
+
+## License
+
+[MIT](./LICENSE)
