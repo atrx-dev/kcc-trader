@@ -47,7 +47,16 @@ export function SiteFooter({
               Find the trade. Keep the collection moving.
             </p>
             <p className="mt-2 max-w-sm text-sm leading-relaxed text-white/45">
-              Fan-made for Koi Card Collector players. Not affiliated with KCC or Discord.
+              Fan-made for Koi Card Collector players. Not affiliated with KCC or Discord.{" "}
+              <a
+                href="https://github.com/atrx-dev/kcc-trader"
+                target="_blank"
+                rel="noreferrer"
+                className="text-white/55 outline-none transition-colors hover:text-white focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                Open source on GitHub
+              </a>
+              .
             </p>
           </div>
 
@@ -71,6 +80,14 @@ export function SiteFooter({
                 {link.label}
               </a>
             ))}
+            <a
+              href="https://github.com/atrx-dev/kcc-trader"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-2xl border border-white/10 bg-white/[0.03] px-3.5 py-2 text-sm text-white/70 outline-none transition-colors hover:border-white/20 hover:bg-white/[0.06] hover:text-white focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              GitHub
+            </a>
           </nav>
         </div>
 
@@ -88,7 +105,16 @@ export function SiteFooter({
             {catalogSyncedAt ? ` · synced ${catalogSyncedAt}` : ""}
           </p>
           <p>
-            Found a bug? Message{" "}
+            Found a bug?{" "}
+            <a
+              href="https://github.com/atrx-dev/kcc-trader/issues/new"
+              target="_blank"
+              rel="noreferrer"
+              className="text-white/55 outline-none transition-colors hover:text-white focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              Open a GitHub issue
+            </a>{" "}
+            or message{" "}
             <a
               href="https://discord.com/users/204699700316602369"
               target="_blank"
