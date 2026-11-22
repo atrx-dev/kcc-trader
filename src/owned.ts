@@ -1,5 +1,5 @@
 import { artUrl, removeKey, writeKey } from "./sync.ts";
-import { type Card } from "./types.ts";
+import { asLegacyCard, cardKey, type Card, type CardCategory } from "./types.ts";
 
 const ORIGIN = "https://koi-card-collector.com";
 const PAGES_PER_PASS = 45;
@@ -16,7 +16,10 @@ export interface SyncProgress {
 export interface OwnedCards {
   ss: string[];
   sss: string[];
+  /** Full visual keys (`base:border+artId`) for version-accurate ownership marks. */
+  editions?: string[];
   duplicates?: Record<string, number>;
+  editionDuplicates?: Record<string, number>;
   copies: number;
   hidden: boolean;
   complete: boolean;
@@ -53,6 +56,7 @@ interface OwnedSyncState {
   hidden: boolean;
   ss: Record<string, number>;
   sss: Record<string, number>;
+  editions: Record<string, number>;
   artwork: Card[];
   copies: number;
   profile: SyncedProfile | null;
@@ -74,7 +78,7 @@ function withNextSync(owned: OwnedCards): CachedOwned {
 interface CollectionVariant {
   id?: string;
   name?: string;
-  art?: { crop?: string };
+  art?: { crop?: string; border?: string; holo?: string; fullCard?: boolean };
 }
 
 interface CollectionPage {
@@ -131,28 +135,32 @@ function reachesUntracked(page: CollectionPage): boolean {
   return (page.cards ?? []).some((entry) => entry.copy?.characterId && !isTracked(entry.copy.rank));
 }
 
-function legacySsCard(
+function editionCard(
   characterId: string,
+  rank: "SS" | "SSS",
   character: { name?: string; game?: string; creator?: string },
   variant: CollectionVariant,
 ): Card | null {
   const image = artUrl(variant.art?.crop);
-  if (!variant.id || !character.name || !image) return null;
-  return {
+  if (!character.name || !image) return null;
+  if (rank === "SS" && !variant.id) return null;
+  const border = rank === "SSS" ? (variant.art?.border ?? "starry") : null;
+  const card: Card = {
     id: characterId,
     name: character.name,
     game: character.game ?? "",
     creator: character.creator ?? "",
-    rank: "SS",
-    category: "characters",
+    rank,
+    category: "characters" as CardCategory,
     eventName: null,
-    variantId: variant.id,
-    variantName: variant.name || "SS artwork",
-    border: null,
-    holo: null,
-    fullCard: false,
+    variantId: variant.id ?? null,
+    variantName: variant.name || (rank === "SS" ? "SS artwork" : null),
+    border,
+    holo: variant.art?.holo ?? null,
+    fullCard: variant.art?.fullCard === true,
     image,
   };
+  return asLegacyCard(card);
 }
 
 function profileFrom(page: CollectionPage): SyncedProfile | null {
@@ -175,13 +183,14 @@ function profileFrom(page: CollectionPage): SyncedProfile | null {
 }
 
 function artworkKey(card: Card): string {
-  return card.variantId ? `${card.id}:${card.variantId}` : card.id;
+  return cardKey(asLegacyCard(card));
 }
 
 function absorbPages(
   pages: CollectionPage[],
   ss: Map<string, number>,
   sss: Map<string, number>,
+  editions: Map<string, number>,
   artwork: Map<string, Card>,
 ): number {
   let copies = 0;
@@ -190,20 +199,31 @@ function absorbPages(
       const copy = entry.copy;
       if (!copy?.characterId || !isTracked(copy.rank)) continue;
       copies += 1;
+      const variant = copy.variant ?? {};
       if (copy.rank === "SSS") {
-        const key = `${copy.characterId}:${copy.variant?.id ?? ""}`;
-        sss.set(key, (sss.get(key) ?? 0) + 1);
+        const base = `${copy.characterId}:${variant.id ?? ""}`;
+        sss.set(base, (sss.get(base) ?? 0) + 1);
+        const card = editionCard(copy.characterId, "SSS", entry.character ?? {}, variant);
+        if (card) {
+          const key = cardKey(card);
+          editions.set(key, (editions.get(key) ?? 0) + 1);
+          artwork.set(artworkKey(card), card);
+        }
         continue;
       }
-      const variantId = copy.variant?.id;
+      const variantId = variant.id;
       if (!variantId) {
         ss.set(copy.characterId, (ss.get(copy.characterId) ?? 0) + 1);
         continue;
       }
-      const key = `${copy.characterId}:${variantId}`;
-      ss.set(key, (ss.get(key) ?? 0) + 1);
-      const card = legacySsCard(copy.characterId, entry.character ?? {}, copy.variant ?? {});
-      if (card) artwork.set(key, card);
+      const base = `${copy.characterId}:${variantId}`;
+      ss.set(base, (ss.get(base) ?? 0) + 1);
+      const card = editionCard(copy.characterId, "SS", entry.character ?? {}, variant);
+      if (card) {
+        const key = cardKey(card);
+        editions.set(key, (editions.get(key) ?? 0) + 1);
+        artwork.set(artworkKey(card), card);
+      }
     }
   }
   return copies;
@@ -222,6 +242,7 @@ async function fetchOwnedPass(
 }> {
   const ss = new Map<string, number>(prior ? Object.entries(prior.ss) : []);
   const sss = new Map<string, number>(prior ? Object.entries(prior.sss) : []);
+  const editions = new Map<string, number>(prior ? Object.entries(prior.editions ?? {}) : []);
   const artwork = new Map<string, Card>(prior ? prior.artwork.map((card) => [artworkKey(card), card]) : []);
   let copies = prior?.copies ?? 0;
   let next = prior?.nextPage ?? 0;
@@ -266,7 +287,7 @@ async function fetchOwnedPass(
     done = next >= pageCount || results.some(reachesUntracked);
   }
 
-  copies += absorbPages(pages, ss, sss, artwork);
+  copies += absorbPages(pages, ss, sss, editions, artwork);
 
   const state: OwnedSyncState = {
     nextPage: next,
@@ -276,6 +297,7 @@ async function fetchOwnedPass(
     hidden,
     ss: Object.fromEntries(ss),
     sss: Object.fromEntries(sss),
+    editions: Object.fromEntries(editions),
     artwork: [...artwork.values()],
     copies,
     profile,
@@ -286,7 +308,9 @@ async function fetchOwnedPass(
   const owned: OwnedCards = {
     ss: [...ss.keys()],
     sss: [...sss.keys()],
+    editions: [...editions.keys()],
     duplicates: Object.fromEntries([...ss, ...sss].filter(([, count]) => count > 1)),
+    editionDuplicates: Object.fromEntries([...editions].filter(([, count]) => count > 1)),
     copies,
     hidden,
     complete: done,
@@ -306,7 +330,16 @@ async function fetchOwnedPass(
 }
 
 export function ownsCard(owned: OwnedCards, key: string): boolean {
-  const [id = "", variantId = "", rank = ""] = key.split(":");
+  const [id = "", variantId = "", rank = "", edition] = key.split(":");
+  if (edition) {
+    if (owned.editions?.includes(key)) return true;
+    // Fall back to base ownership when edition data is missing from an old cache.
+    if (!owned.editions?.length) {
+      if (rank === "SSS") return owned.sss.includes(`${id}:${variantId}`);
+      if (rank === "SS") return owned.ss.includes(variantId ? `${id}:${variantId}` : id);
+    }
+    return false;
+  }
   if (rank === "SSS") return owned.sss.includes(`${id}:${variantId}`);
   if (rank === "SS") return owned.ss.includes(variantId ? `${id}:${variantId}` : id);
   return false;

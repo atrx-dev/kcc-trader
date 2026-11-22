@@ -94,6 +94,12 @@ export const FEATURES: FeatureNote[] = [
     body: "On Wishlist, Manage kept cards leaves chosen cards on the list after you own them — even when Clear owned from Wishlist is on. You can keep one before you own it.",
     image: "/features/kept-cards.svg",
   },
+  {
+    id: "legacy-editions",
+    title: "Legacy borders and art",
+    body: "When the dex changes a card's border or artwork, the old look stays in the catalog as its own Legacy card. Filter Type to Legacy to find them, and owned marks follow the version you actually have.",
+    image: "/features/legacy-editions.svg",
+  },
 ];
 
 function newestFirst(notes: readonly FeatureNote[]): FeatureNote[] {

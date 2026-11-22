@@ -1,5 +1,5 @@
 import { ArrowLeftRight, Handshake, Heart, LayoutGrid, type LucideIcon } from "lucide-react";
-import { cardKey, type Card } from "../types.ts";
+import { cardKey, visualKey, type Card } from "../types.ts";
 
 export interface SessionProfile {
   id: string;
@@ -184,7 +184,9 @@ export interface SyncProgress {
 export interface OwnedCards {
   ss: string[];
   sss: string[];
+  editions?: string[];
   duplicates?: Record<string, number>;
+  editionDuplicates?: Record<string, number>;
   hidden: boolean;
   complete?: boolean;
   fetchedAt: string;
@@ -196,7 +198,9 @@ export interface OwnedState {
   status: "idle" | "loading" | "ready" | "hidden" | "unavailable";
   ss: Set<string>;
   sss: Set<string>;
+  editions: Set<string>;
   duplicates: Record<string, number>;
+  editionDuplicates: Record<string, number>;
   fetchedAt: string | null;
   nextSyncAt: string | null;
   syncing: boolean;
@@ -319,7 +323,9 @@ export const NO_OWNED: OwnedState = {
   status: "idle",
   ss: new Set(),
   sss: new Set(),
+  editions: new Set(),
   duplicates: {},
+  editionDuplicates: {},
   fetchedAt: null,
   nextSyncAt: null,
   syncing: false,
@@ -337,7 +343,9 @@ export function ownedFromResponse(data: OwnedCards): OwnedState {
     status: data.hidden ? "hidden" : "ready",
     ss: new Set(data.ss),
     sss: new Set(data.sss),
+    editions: new Set(data.editions ?? []),
     duplicates: data.duplicates ?? {},
+    editionDuplicates: data.editionDuplicates ?? {},
     fetchedAt: data.fetchedAt,
     nextSyncAt: data.nextSyncAt,
     syncing: false,
@@ -384,9 +392,11 @@ export function formatTime(value: string): string {
 }
 
 export function isOwned(card: Card, owned: OwnedState): boolean {
+  if (card.rank !== "SSS" && card.rank !== "SS") return false;
+  if (owned.editions.size > 0) return owned.editions.has(visualKey(card));
+  // Older owned caches without edition fingerprints fall back to base ownership.
   if (card.rank === "SSS") return owned.sss.has(`${card.id}:${card.variantId ?? ""}`);
-  if (card.rank === "SS") return owned.ss.has(card.variantId ? `${card.id}:${card.variantId}` : card.id);
-  return false;
+  return owned.ss.has(card.variantId ? `${card.id}:${card.variantId}` : card.id);
 }
 
 export function byName(cards: readonly Card[]): Card[] {
@@ -428,12 +438,15 @@ export function priorityFirst(cards: Card[], priority: ReadonlySet<string>): Car
 }
 
 export function duplicateCount(card: Card, owned: OwnedState): number {
+  if (card.rank !== "SSS" && card.rank !== "SS") return 0;
+  if (Object.keys(owned.editionDuplicates).length > 0) {
+    const count = owned.editionDuplicates[visualKey(card)] ?? 0;
+    return count > 1 ? count : 0;
+  }
   const count =
     card.rank === "SSS"
       ? (owned.duplicates[`${card.id}:${card.variantId ?? ""}`] ?? 0)
-      : card.rank === "SS"
-        ? (owned.duplicates[card.variantId ? `${card.id}:${card.variantId}` : card.id] ?? 0)
-        : 0;
+      : (owned.duplicates[card.variantId ? `${card.id}:${card.variantId}` : card.id] ?? 0);
   return count > 1 ? count : 0;
 }
 
@@ -581,6 +594,7 @@ export function uniqueSorted(values: string[]): string[] {
 }
 
 export function cardTypeLabel(card: Card): string {
+  if (card.legacy) return "Legacy";
   const border = card.border ?? "";
   const eventName = card.eventName ?? "";
   const variantName = card.variantName ?? "";
@@ -603,7 +617,7 @@ export function cardTypeLabel(card: Card): string {
 }
 
 export function searchableText(card: Card): string {
-  return `${card.name} ${card.variantName ?? ""} ${card.game} ${card.creator}`.toLowerCase();
+  return `${card.name} ${card.variantName ?? ""} ${card.game} ${card.creator}${card.legacy ? " legacy" : ""}`.toLowerCase();
 }
 
 export function orderedValues(values: string[], order: string[]): string[] {

@@ -1,9 +1,18 @@
-import { cardKey, type Card, type CardCategory, type Catalog } from "./types.ts";
+import {
+  asLegacyCard,
+  baseCardKey,
+  cardKey,
+  sameVisual,
+  type Card,
+  type CardCategory,
+  type Catalog,
+} from "./types.ts";
 
 const ORIGIN = "https://koi-card-collector.com";
 const MAX_PAGES = 40;
 const HIDDEN_KEY = "hidden-characters";
 const SS_ARTWORK_KEY = "ss-artwork";
+const LEGACY_EDITIONS_KEY = "legacy-editions";
 const MAX_DISCOVERIES = 5;
 const SYNC_STATE_KEY = "catalog-sync";
 const REQUEST_BUDGET = 40;
@@ -242,6 +251,7 @@ export async function ensureKccChanPromo(env: SyncEnv): Promise<boolean> {
   if (!character) return false;
   const cards = kccChanCards(character);
   const byKey = new Map(catalog.cards.map((card) => [cardKey(card), card]));
+  const demoted: Card[] = [];
   let changed = false;
   const at = new Date().toISOString();
   for (const card of cards) {
@@ -252,18 +262,23 @@ export async function ensureKccChanPromo(env: SyncEnv): Promise<boolean> {
       changed = true;
       continue;
     }
+    const visualChanged = !sameVisual(previous, card);
     if (
       previous.holo !== card.holo ||
       previous.fullCard !== card.fullCard ||
-      previous.image !== card.image ||
+      visualChanged ||
       previous.eventName !== card.eventName ||
-      previous.game !== card.game
+      previous.game !== card.game ||
+      previous.border !== card.border
     ) {
-      byKey.set(key, { ...previous, ...card, addedAt: previous.addedAt });
+      if (visualChanged && !previous.legacy) demoted.push(asLegacyCard(previous, previous.addedAt ?? at));
+      byKey.set(key, { ...previous, ...card, edition: null, legacy: false, addedAt: previous.addedAt });
       changed = true;
     }
   }
   if (!changed) return false;
+  if (demoted.length) await mergeLegacyEditions(env, demoted);
+  for (const card of demoted) byKey.set(cardKey(card), card);
   await writeKey(env, "catalog", JSON.stringify({ ...catalog, cards: [...byKey.values()] }));
   return true;
 }
@@ -422,38 +437,98 @@ async function listDex(run: SyncRun, listing: NonNullable<SyncRun["listing"]>): 
   } else run.listing = null;
 }
 
-export async function readSsArtwork(env: SyncEnv): Promise<Card[]> {
-  return (await env.CARDS.get<Card[]>(SS_ARTWORK_KEY, "json")) ?? [];
+export async function readLegacyEditions(env: SyncEnv): Promise<Card[]> {
+  const stored = await env.CARDS.get<Card[]>(LEGACY_EDITIONS_KEY, "json");
+  if (stored) return stored;
+  // Migrate older SS-only artwork cache into the unified legacy store.
+  const legacy = await env.CARDS.get<Card[]>(SS_ARTWORK_KEY, "json");
+  if (!legacy?.length) return [];
+  const migrated = legacy.map((card) => asLegacyCard(card));
+  await writeKey(env, LEGACY_EDITIONS_KEY, JSON.stringify(migrated));
+  return migrated;
 }
 
-export async function addSsArtwork(env: SyncEnv, cards: Card[]): Promise<boolean> {
-  if (cards.length === 0) return false;
-  const stored = await readSsArtwork(env);
-  const byKey = new Map(stored.map((card) => [cardKey(card), card]));
-  let added = false;
+/** @deprecated Use readLegacyEditions */
+export async function readSsArtwork(env: SyncEnv): Promise<Card[]> {
+  return readLegacyEditions(env);
+}
+
+function activeByBase(cards: Card[]): Map<string, Card> {
+  const map = new Map<string, Card>();
   for (const card of cards) {
-    const key = cardKey(card);
-    if (byKey.has(key)) continue;
-    byKey.set(key, card);
-    added = true;
+    if (card.legacy) continue;
+    map.set(baseCardKey(card), card);
   }
+  return map;
+}
+
+function legacyStillDistinct(card: Card, current: Map<string, Card>): boolean {
+  const now = current.get(baseCardKey(card));
+  if (!now) return true;
+  return !sameVisual(card, now);
+}
+
+export async function writeLegacyEditions(env: SyncEnv, cards: Card[]): Promise<void> {
+  await writeKey(env, LEGACY_EDITIONS_KEY, JSON.stringify(cards));
+}
+
+export async function mergeLegacyEditions(env: SyncEnv, incoming: Card[]): Promise<Card[]> {
+  const stored = await readLegacyEditions(env);
+  const byKey = new Map(stored.map((card) => [cardKey(asLegacyCard(card)), asLegacyCard(card)]));
+  let changed = false;
+  for (const card of incoming) {
+    const legacy = asLegacyCard(card);
+    const key = cardKey(legacy);
+    if (byKey.has(key)) continue;
+    byKey.set(key, legacy);
+    changed = true;
+  }
+  const next = [...byKey.values()];
+  if (changed) await writeLegacyEditions(env, next);
+  return next;
+}
+
+export async function addLegacyEditions(env: SyncEnv, cards: Card[]): Promise<boolean> {
+  if (cards.length === 0) return false;
+  const catalog = await readCatalog(env);
+  const current = activeByBase(catalog.cards);
+  const candidates = cards.filter((card) => legacyStillDistinct(card, current));
+  if (candidates.length === 0) return false;
+  const before = await readLegacyEditions(env);
+  const beforeKeys = new Set(before.map((card) => cardKey(asLegacyCard(card))));
+  const merged = await mergeLegacyEditions(env, candidates);
+  const added = merged.some((card) => !beforeKeys.has(cardKey(card)));
   if (!added) return false;
-  await writeKey(env, SS_ARTWORK_KEY, JSON.stringify([...byKey.values()]));
+  return publishLegacyIntoCatalog(env, merged);
+}
+
+/** @deprecated Use addLegacyEditions */
+export async function addSsArtwork(env: SyncEnv, cards: Card[]): Promise<boolean> {
+  return addLegacyEditions(env, cards);
+}
+
+export async function publishLegacyIntoCatalog(env: SyncEnv, legacy?: Card[]): Promise<boolean> {
   const catalog = await readCatalog(env);
   if (!catalog.syncedAt) return false;
+  const editions = legacy ?? (await readLegacyEditions(env));
+  const current = activeByBase(catalog.cards);
+  const extras = editions.filter((card) => legacyStillDistinct(card, current));
   const known = new Set(catalog.cards.map((card) => cardKey(card)));
-  const extra = [...byKey.values()].filter((card) => !known.has(cardKey(card)));
-  if (extra.length === 0) return false;
   const at = new Date().toISOString();
-  const extraStamped = extra.map((card) => ({ ...card, addedAt: card.addedAt ?? at }));
-  await writeKey(env, "catalog", JSON.stringify({ ...catalog, cards: [...catalog.cards, ...extraStamped] }));
+  const fresh = extras.filter((card) => !known.has(cardKey(card))).map((card) => ({
+    ...asLegacyCard(card),
+    addedAt: card.addedAt ?? at,
+  }));
+  if (fresh.length === 0) return false;
+  await writeKey(env, "catalog", JSON.stringify({ ...catalog, cards: [...catalog.cards, ...fresh] }));
   return true;
 }
 
 function rememberAddedAt(previous: Card[], cards: Card[], at: string): Card[] {
-  const known = new Map(previous.map((card) => [cardKey(card), card.addedAt]));
+  const known = new Map(previous.filter((card) => !card.legacy).map((card) => [baseCardKey(card), card.addedAt]));
   return cards.map((card) => {
-    const key = cardKey(card);
+    if (card.legacy) return card;
+    const key = baseCardKey(card);
     if (known.has(key)) {
       const addedAt = known.get(key);
       return addedAt ? { ...card, addedAt } : card;
@@ -462,7 +537,19 @@ function rememberAddedAt(previous: Card[], cards: Card[], at: string): Card[] {
   });
 }
 
-function finishRun(run: SyncRun, artwork: Card[], promos: Card[] = []): Catalog {
+function preserveChangedEditions(previous: Card[], current: Card[], at: string): Card[] {
+  const now = activeByBase(current);
+  const out: Card[] = [];
+  for (const card of previous) {
+    if (card.legacy) continue;
+    const next = now.get(baseCardKey(card));
+    if (!next || sameVisual(card, next)) continue;
+    out.push(asLegacyCard(card, card.addedAt ?? at));
+  }
+  return out;
+}
+
+function finishRun(run: SyncRun, legacy: Card[], promos: Card[] = []): Catalog {
   const seenVariants = new Set(
     run.cards
       .filter((card) => card.rank === "SSS")
@@ -470,13 +557,20 @@ function finishRun(run: SyncRun, artwork: Card[], promos: Card[] = []): Catalog 
       .filter((id): id is string => Boolean(id)),
   );
   const extraEvents = run.eventCards.filter((card) => !card.variantId || !seenVariants.has(card.variantId));
-  const seen = new Set(
-    [...run.cards, ...extraEvents, ...(run.hidden?.cards ?? []), ...artwork].map((card) => cardKey(card)),
-  );
-  const extraPromos = promos.filter((card) => !seen.has(cardKey(card)));
+  const live = [...run.cards, ...extraEvents, ...(run.hidden?.cards ?? [])];
+  const seen = new Set(live.map((card) => cardKey(card)));
+  const extraPromos = promos.filter((card) => {
+    if (seen.has(cardKey(card))) return false;
+    seen.add(cardKey(card));
+    return true;
+  });
+  const currentByBase = activeByBase([...live, ...extraPromos]);
+  const distinctLegacy = legacy
+    .map((card) => asLegacyCard(card))
+    .filter((card) => legacyStillDistinct(card, currentByBase) && !seen.has(cardKey(card)));
   return {
     syncedAt: new Date().toISOString(),
-    cards: [...run.cards, ...extraEvents, ...(run.hidden?.cards ?? []), ...artwork, ...extraPromos],
+    cards: [...live, ...extraPromos, ...distinctLegacy],
   };
 }
 
@@ -536,12 +630,15 @@ export async function stepCatalogSync(env: SyncEnv, force = false, owner = ""): 
     return { status: "running", remaining: run.pending.length + (run.hidden?.pending.length ?? 0), owner: claim.owner };
   }
 
-  const seen = new Set([...run.cards, ...run.eventCards, ...(run.hidden?.cards ?? [])].map((card) => cardKey(card)));
-  const artwork = (await readSsArtwork(env)).filter((card) => !seen.has(cardKey(card)));
   const previous = await readCatalog(env);
+  const at = new Date().toISOString();
+  const liveDraft = [...run.cards, ...run.eventCards, ...(run.hidden?.cards ?? [])];
+  const fromDex = preserveChangedEditions(previous.cards, liveDraft, at);
+  const previousLegacy = previous.cards.filter((card) => card.legacy);
+  const storedLegacy = await mergeLegacyEditions(env, [...previousLegacy, ...fromDex]);
   const kccChan = await fetchKccChanCharacter().catch(() => null);
   const promos = kccChan ? kccChanCards(kccChan) : [];
-  const catalog = finishRun(run, artwork, promos);
+  const catalog = finishRun(run, storedLegacy, promos);
   if (previous.syncedAt && catalog.syncedAt) {
     catalog.cards = rememberAddedAt(previous.cards, catalog.cards, catalog.syncedAt);
   }
@@ -587,6 +684,8 @@ export async function readCatalog(env: SyncEnv): Promise<Catalog> {
         holo: card.holo ?? null,
         fullCard: card.fullCard === true,
         image: artUrl(card.image),
+        edition: card.edition ?? null,
+        legacy: card.legacy === true,
       })),
   };
 }

@@ -155,6 +155,18 @@ function NewMark() {
   );
 }
 
+function LegacyMark() {
+  return (
+    <span
+      className="legacy-mark pointer-events-none inline-flex h-5 items-center rounded-full bg-orange-200 px-1.5 py-1 text-[11px] leading-none font-bold text-orange-950 shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
+      aria-label="Legacy, no longer available in the dex"
+      title="No longer available in the dex"
+    >
+      Legacy
+    </span>
+  );
+}
+
 function OwnedMark() {
   return (
     <span
@@ -202,7 +214,8 @@ export function CardFace({
   onPriority?: () => void;
 }) {
   const holo = effects && (card.rank === "S" || card.rank === "SS" || card.rank === "SSS");
-  const fresh = isNewCard(card);
+  const legacy = card.legacy === true;
+  const fresh = !legacy && isNewCard(card);
   const framed = hasFrame(card);
   const [mediaReady, setMediaReady] = useState(mediaDelay <= 0);
   useEffect(() => {
@@ -224,7 +237,7 @@ export function CardFace({
       )}
       data-rank={card.rank}
       data-sss-border={card.rank === "SSS" && framed ? card.border || "starry" : undefined}
-      aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${fresh ? ", new" : ""}${priority ? ", priority" : ""}${copies > 1 ? `, ${copies} copies` : owned ? ", owned" : ""}${wanted > 0 ? `, wishlisted by ${wanted}` : ""}`}
+      aria-label={`${card.name}${card.variantName ? `, ${card.variantName}` : ""}, ${card.rank}, ${card.game} by ${card.creator}${legacy ? ", legacy" : ""}${fresh ? ", new" : ""}${priority ? ", priority" : ""}${copies > 1 ? `, ${copies} copies` : owned ? ", owned" : ""}${wanted > 0 ? `, wishlisted by ${wanted}` : ""}`}
     >
       {card.image && showMedia ? (
         <img
@@ -254,9 +267,10 @@ export function CardFace({
     <div className="card-stack">
       {holo ? <FoilCard card={card}>{face}</FoilCard> : face}
       {onPriority ? <PriorityToggle active={priority} onClick={onPriority} /> : priority ? <PriorityMark /> : null}
-      {copies > 1 || owned || fresh || wanted > 0 ? (
+      {copies > 1 || owned || fresh || legacy || wanted > 0 ? (
         <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-3.25rem)] flex-wrap items-center gap-1">
           {copies > 1 ? <DuplicateMark count={copies} /> : owned ? <OwnedMark /> : null}
+          {legacy ? <LegacyMark /> : null}
           {fresh ? <NewMark /> : null}
           {wanted > 0 ? <WantedMark count={wanted} /> : null}
         </div>
