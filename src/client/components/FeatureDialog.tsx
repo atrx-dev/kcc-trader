@@ -52,6 +52,16 @@ export function FeatureDialog({
               <p className="text-xs font-semibold tracking-wider text-amber-200/80 uppercase">What's new</p>
               <Dialog.Title className="mt-1 font-display text-xl font-bold">{note.title}</Dialog.Title>
               <Dialog.Description className="mt-2 text-sm text-white/70">{note.body}</Dialog.Description>
+              {note.href ? (
+                <a
+                  href={note.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 inline-flex text-sm font-semibold text-amber-200/90 outline-none transition-colors hover:text-amber-100 focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  {note.linkLabel ?? note.href}
+                </a>
+              ) : null}
             </div>
             <div className="mt-5 flex shrink-0 items-center justify-between gap-3">
               <button

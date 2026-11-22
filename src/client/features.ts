@@ -6,6 +6,8 @@ export interface FeatureNote {
   addedAt: string;
   image?: string;
   bleed?: boolean;
+  href?: string;
+  linkLabel?: string;
 }
 
 export const SEEN_FEATURE_KEY = "kcc-trader:seen-feature";
@@ -117,6 +119,15 @@ export const FEATURES: FeatureNote[] = [
     body: "When the dex changes a card's border or artwork, the old look stays in the catalog as its own Legacy card. Filter Type to Legacy to find them, and owned marks follow the version you actually have.",
     addedAt: "2026-11-22",
     image: "/features/legacy-editions.svg",
+  },
+  {
+    id: "open-source",
+    title: "Open source on GitHub",
+    body: "KCC Trader is open source. Browse the code, follow along, or open an issue when something breaks — the footer links there too.",
+    addedAt: "2026-11-22",
+    image: "/features/open-source.svg",
+    href: "https://github.com/atrx-dev/kcc-trader",
+    linkLabel: "View on GitHub",
   },
 ];
 
