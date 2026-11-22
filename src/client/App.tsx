@@ -22,7 +22,7 @@ import { HelpPage } from "./pages/HelpPage.tsx";
 import { PrivacyPage } from "./pages/PrivacyPage.tsx";
 import { TermsPage } from "./pages/TermsPage.tsx";
 import { FeatureDialog } from "./components/FeatureDialog.tsx";
-import { FEATURES, SEEN_FEATURE_KEY, unseenFeatures } from "./features.ts";
+import { FEATURES, SEEN_FEATURE_KEY, recentFeatures, unseenFeatures } from "./features.ts";
 
 const INITIAL_PAGE = pageFromPath(window.location.pathname);
 const INITIAL_URL_STATE = readUrlState(window.location.search);
@@ -1027,7 +1027,7 @@ export function App() {
             !legalOpen &&
             (replayFeatures || (settings.featureNotes && featureNotes.length > 0))
           }
-          notes={replayFeatures ? [...FEATURES].reverse() : featureNotes}
+          notes={replayFeatures ? recentFeatures() : featureNotes}
           onDismiss={dismissFeatures}
           onDisable={disableFeatures}
         />
